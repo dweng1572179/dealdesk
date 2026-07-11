@@ -234,6 +234,13 @@ def run() -> None:
                       follow_redirects=False).status_code == 303
         assert any(d["name"] == "Harbor Pointe Apartments" for d in db.list_deals()), "reload demo failed"
 
+        # ── login rate-limit (LAST — exhausts the per-IP throttle) ──
+        # already authenticated via cookie; hammering /login with wrong passwords must
+        # start returning 429 rather than allowing unbounded brute-force attempts.
+        codes = [c.post("/login", data={"password": "wrong"}, follow_redirects=False).status_code
+                 for _ in range(12)]
+        assert 429 in codes, f"login should throttle after repeated failures: {codes}"
+
     print("test_smoke OK")
 
 

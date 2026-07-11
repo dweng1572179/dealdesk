@@ -175,6 +175,32 @@ Both suites run on every push/PR (Python 3.11–3.13) with **no keys and no netw
 see [`.github/workflows/ci.yml`](.github/workflows/ci.yml). If it's green, the whole
 app works offline on a clean checkout.
 
+## Security & self-hosting
+
+DealDesk is a **single-user** app: one password, a signed-session cookie, no accounts.
+That keeps it simple; it also sets the security model. Before exposing it beyond
+localhost:
+
+- **Set `DEALDESK_PASSWORD`** to something real (the login is rate-limited — 8 failed
+  attempts per IP in 5 minutes returns `429` — to blunt brute-forcing).
+- **Set `SECRET_KEY`** in `.env` so sessions survive restarts (otherwise a random key is
+  generated each boot and everyone is logged out).
+- **Put it behind HTTPS** (a reverse proxy — Caddy or nginx — terminates TLS) and set
+  `SESSION_HTTPS_ONLY=true`, which adds the `Secure` flag to the session cookie.
+- The session cookie is **`SameSite=Lax`**, so browsers don't attach it to cross-site
+  `POST`s — that's the CSRF control for the app's mutations. It's also `HttpOnly`.
+- **The SQLite DB holds your Anthropic key and email App Password in cleartext** (same as
+  `.env`). DealDesk `chmod 0600`s the DB file; keep the box (and the Docker volume) private.
+
+```bash
+docker compose up        # → http://localhost:8799, DB persisted in a named volume
+```
+
+This is deliberately built for **one trusted user on their own box**. Exposing it to
+untrusted or multiple users is out of scope — that's where you'd add per-request CSRF
+tokens, real accounts, and audit logging. The single-user shape is the point, not an
+oversight.
+
 ## What DealDesk deliberately is not
 
 Lev's moat is a **live proprietary capital-markets feed** (real-time pricing and

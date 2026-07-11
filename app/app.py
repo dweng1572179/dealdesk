@@ -2,6 +2,7 @@
 db.py, AI behind ai.py, email behind inbox.py. Auth is one password + a signed
 session cookie (Starlette SessionMiddleware). Same shape as OpenProp."""
 import secrets
+import time
 
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -63,15 +64,37 @@ def login_form(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 
+# ponytail: in-memory per-IP login throttle — a per-process dict, resets on restart, no
+# Redis. A single self-hosted instance only needs to blunt password brute-forcing; scale
+# to a shared store only if you run multiple workers behind a load balancer.
+_LOGIN_HITS: dict[str, list[float]] = {}
+_LOGIN_MAX = 8          # failed attempts per IP
+_LOGIN_WINDOW = 300.0   # ...within this many seconds
+
+
+def _login_blocked(ip: str) -> bool:
+    now = time.time()
+    hits = [t for t in _LOGIN_HITS.get(ip, ()) if now - t < _LOGIN_WINDOW]
+    _LOGIN_HITS[ip] = hits
+    return len(hits) >= _LOGIN_MAX
+
+
 @app.post("/login")
 def login(request: Request, password: str = Form(...)):
+    ip = request.client.host if request.client else "?"
+    if _login_blocked(ip):
+        return templates.TemplateResponse(
+            "login.html", {"request": request, "error": "Too many attempts — wait a few minutes."},
+            status_code=429)
     configured = settings.dealdesk_password
     # A blank configured password must NEVER authenticate — compare_digest("", "")
     # is True, so an empty login field would otherwise walk in. Encode to bytes so a
     # non-ASCII password ("Passwörd") doesn't raise TypeError and 500 every attempt.
     if configured and secrets.compare_digest(password.encode("utf-8"), configured.encode("utf-8")):
+        _LOGIN_HITS.pop(ip, None)   # clear the counter on a successful login
         request.session["auth"] = True
         return RedirectResponse("/", status_code=303)
+    _LOGIN_HITS.setdefault(ip, []).append(time.time())
     return templates.TemplateResponse(
         "login.html", {"request": request, "error": "Wrong password."}, status_code=401)
 
