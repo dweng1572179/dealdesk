@@ -36,19 +36,22 @@ async def placement_add(request: Request, deal_id: int, _=Depends(require_auth))
     if not name:
         return templates.TemplateResponse("_error.html", {
             "request": request, "msg": "A placement needs a lender name."})
-    status = (form.get("status") or "shopped").strip()
-    if status not in PLACEMENT_STATUSES:
+    # No status field on the hand-add / "+ shop" forms → pass None so an existing
+    # placement keeps its status (db defaults a brand-new one to 'shopped'). An
+    # explicit invalid status falls back to 'shopped'.
+    status = (form.get("status") or "").strip()
+    if status and status not in PLACEMENT_STATUSES:
         status = "shopped"
     lender_id = form.get("lender_id")
     db.upsert_placement({
         "deal_id": deal_id, "lender_name": name,
         "lender_id": int(lender_id) if (lender_id or "").isdigit() else None,
-        "status": status,
+        "status": status or None,
         "loan_amount": (lambda v: int(v) if v is not None else None)(_num(form.get("loan_amount"))),
         "rate": _num(form.get("rate")), "ltv": _num(form.get("ltv")),
         "term_years": _num(form.get("term_years")), "amort_years": _num(form.get("amort_years")),
         "notes": (form.get("notes") or "").strip() or None})
-    db.add_activity("note", f"Placement: {name} · {status}", deal_id)
+    db.add_activity("note", f"Placement: {name} · {status or 'shopped'}", deal_id)
     return _placements(request, deal_id)
 
 

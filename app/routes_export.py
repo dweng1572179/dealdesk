@@ -100,16 +100,18 @@ async def restore_db(request: Request, file: UploadFile, _=Depends(require_auth)
     with a `deal` table before overwriting, and keeps a .bak of the current DB."""
     import os
     import sqlite3
-    import tempfile
     raw = await file.read()
     if raw[:16] != b"SQLite format 3\x00":
         return templates.TemplateResponse("_error.html", {
             "request": request, "msg": "That is not a SQLite database file."})
-    # validate against a temp copy before touching the live file
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
+    # Stage the upload NEXT TO the live DB (same directory → same filesystem), so the
+    # final os.replace is atomic and can't fail cross-device (a /tmp temp file often
+    # lives on a different mount than the DB). Validate the staged copy before swapping.
+    staged = settings.db_path + ".restore.tmp"
     try:
-        tmp.write(raw); tmp.flush(); tmp.close()
-        probe = sqlite3.connect(tmp.name)
+        with open(staged, "wb") as f:
+            f.write(raw)
+        probe = sqlite3.connect(staged)
         try:
             tables = {r[0] for r in probe.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'")}
@@ -118,17 +120,17 @@ async def restore_db(request: Request, file: UploadFile, _=Depends(require_auth)
         if "deal" not in tables:
             return templates.TemplateResponse("_error.html", {
                 "request": request, "msg": "This SQLite file is not a DealDesk backup (no deal table)."})
-        # swap it in. WAL sidecar files must go too, or a stale -wal masks the new data.
+        # WAL sidecars of the OLD db must go, or a stale -wal masks the restored data.
         for suffix in ("-wal", "-shm"):
             side = settings.db_path + suffix
             if os.path.exists(side):
                 os.remove(side)
         if os.path.exists(settings.db_path):
             os.replace(settings.db_path, settings.db_path + ".bak")
-        os.replace(tmp.name, settings.db_path)
+        os.replace(staged, settings.db_path)   # same-dir → atomic, no cross-device error
     finally:
-        if os.path.exists(tmp.name):
-            os.remove(tmp.name)
+        if os.path.exists(staged):
+            os.remove(staged)
     db.init_db()   # re-apply pragmas + migrations to the restored file
     db.add_activity("system", f"Restored workspace from {file.filename}")
     return RedirectResponse("/backup?restored=1", status_code=303)

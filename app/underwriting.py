@@ -127,7 +127,12 @@ def compute(deal: dict, amort_years: int = 30, noi_growth_pct: float = 3.0,
     exit_cap = exit_cap_pct if exit_cap_pct is not None else cap
     exit_info = None
     returns = {"irr_pct": None, "equity_multiple": None, "profit": None}
-    if noi and exit_cap and equity is not None and equity > 0:
+    # Only model the exit when the leverage is actually computable: either there's no
+    # loan (all-cash) or we have a rate to size debt service AND the payoff. A loan with
+    # no rate would otherwise get payoff=0 — the loan silently vanishes at sale and IRR /
+    # equity multiple balloon, even though equity was booked net of that loan.
+    loan_known = (not loan) or (rate is not None)
+    if noi and exit_cap and equity is not None and equity > 0 and loan_known:
         forward_noi = round(noi * (1 + noi_growth_pct / 100) ** hold_years)
         sale_value = round(forward_noi / exit_cap * 100)
         sale_costs = round(sale_value * sale_cost_pct / 100)
@@ -351,6 +356,10 @@ def demo() -> None:
     assert ex_soft["returns"]["irr_pct"] < ex["returns"]["irr_pct"], "cap expansion cuts IRR"
     # no equity (fully leveraged / no price) → no phantom returns
     assert compute({"noi": 500_000})["returns"]["irr_pct"] is None
+    # a loan with NO rate must not fabricate an exit (payoff would wrongly be 0, dropping
+    # the loan at sale and inflating IRR/equity multiple)
+    norate = compute({"purchase_price": 10_000_000, "loan_amount": 5_000_000, "cap_rate": 6.0})
+    assert norate["exit"] is None and norate["returns"]["irr_pct"] is None, norate["returns"]
 
     # --- price_from_base: index + spread --------------------------------------
     assert price_from_base(4.15, 250) == 6.65

@@ -579,13 +579,17 @@ def upsert_placement(p: dict) -> int:
     rather than stacking duplicates. Only non-None fields overwrite on conflict, so
     'mark as quoted' doesn't blank out terms captured earlier."""
     row = {k: p.get(k) for k in _PLACEMENT_COLS}
-    row["status"] = row.get("status") or "shopped"
     if not row.get("lender_name"):
         raise ValueError("placement needs a lender_name")
     cols = ", ".join(_PLACEMENT_COLS)
-    ph = ", ".join(f":{c}" for c in _PLACEMENT_COLS)
-    # COALESCE(excluded.x, placement.x): a NULL in the new row keeps the stored value.
-    updates = ", ".join(f"{c} = COALESCE(excluded.{c}, placement.{c})"
+    # status is NOT NULL, so a brand-new row defaults to 'shopped'; but a NULL status on
+    # an update must KEEP the stored status, not reset it (re-shopping an already-selected
+    # lender must not downgrade it). Every other column: NULL in the new row keeps stored.
+    # The UPDATE references the raw :params (not excluded.*), so the INSERT's 'shopped'
+    # default can't leak into the update path.
+    ph = ", ".join("COALESCE(:status, 'shopped')" if c == "status" else f":{c}"
+                   for c in _PLACEMENT_COLS)
+    updates = ", ".join(f"{c} = COALESCE(:{c}, placement.{c})"
                         for c in _PLACEMENT_COLS if c not in ("deal_id", "lender_name"))
     with get_conn() as conn:
         cur = conn.execute(
@@ -688,6 +692,12 @@ def demo() -> None:
     assert len(plc) == 1 and plc[0]["status"] == "quoted"
     # the COALESCE upsert must NOT blank the rate captured on the first touch
     assert plc[0]["rate"] == 6.5, plc[0]
+    # a status-less re-shop (the hand-add / "+ shop" path) must KEEP the current status,
+    # not reset it to 'shopped' — re-shopping a selected lender can't downgrade it.
+    upsert_placement({"deal_id": did, "lender_name": "Agency Shop", "status": "selected"})
+    upsert_placement({"deal_id": did, "lender_name": "Agency Shop", "rate": 7.0})  # no status
+    keep = list_placements(did)[0]
+    assert keep["status"] == "selected" and keep["rate"] == 7.0, keep
     upsert_placement({"deal_id": did, "lender_name": "Life Co", "status": "passed"})
     # 'quoted' outranks 'passed' in the list ordering
     assert [p["lender_name"] for p in list_placements(did)] == ["Agency Shop", "Life Co"]

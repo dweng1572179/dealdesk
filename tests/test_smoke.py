@@ -176,6 +176,14 @@ def run() -> None:
         assert c.get("/export/contacts.csv").status_code == 200
         bak = c.get("/backup/dealdesk.db")
         assert bak.status_code == 200 and bak.content[:16] == b"SQLite format 3\x00", "backup must be a real sqlite file"
+        # restore round-trip: the backup we just took must restore cleanly, data intact
+        rr = c.post("/backup/restore", files={"file": ("b.db", bak.content, "application/x-sqlite3")},
+                    follow_redirects=False)
+        assert rr.status_code == 303, rr.status_code
+        assert any(d["name"] == "Test Tower" for d in db.list_deals()), "restore lost data"
+        # a non-sqlite upload is rejected, not applied
+        assert "not a SQLite" in c.post("/backup/restore",
+                                        files={"file": ("x.db", b"nope", "application/octet-stream")}).text
 
         # ── regression: routes must degrade, not 500, on a bad/missing deal id ──
         assert c.post("/deal/999999/stage", data={"stage": "LOI", "pipeline": "acquisition"}).status_code == 200
