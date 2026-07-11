@@ -87,7 +87,12 @@ _COMPANIES = [
 
 
 def seed_if_empty() -> None:
-    if db.list_deals() or db.list_lenders():
+    # Sentinel, not an emptiness check: a user who clears the sample data to start
+    # clean (deletes every seeded deal AND lender) must NOT get the demo set re-inserted
+    # on the next restart. The seed runs exactly once per database.
+    from .settings_store import get_flag, set_flag
+    if get_flag("seeded") or db.list_deals() or db.list_lenders():
+        set_flag("seeded", "1")
         return
     for l in _LENDERS:
         db.upsert_lender(l)
@@ -104,3 +109,5 @@ def seed_if_empty() -> None:
     db.add_activity("system",
                     "Welcome to DealDesk — sample deals, a starter lender book, and market "
                     "reference data loaded. Replace them with your own any time.")
+    from .settings_store import set_flag
+    set_flag("seeded", "1")   # never re-seed this database, even if the user empties it

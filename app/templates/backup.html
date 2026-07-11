@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}DealDesk — backup{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold tracking-tight">Backup &amp; export</h1>
+  <a href="/settings" class="text-sm text-indigo-600 hover:underline">settings →</a>
+</div>
+
+{% if restored %}
+<div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+  Workspace restored. Your previous DB was kept as <code>dealdesk.db.bak</code>.
+</div>
+{% endif %}
+
+<div class="grid md:grid-cols-2 gap-6">
+  <div class="rounded-xl border bg-white p-5">
+    <h2 class="font-semibold text-slate-700 mb-1">Full backup</h2>
+    <p class="text-sm text-slate-500 mb-3">One SQLite file is your entire workspace — deals, contacts, lenders,
+      documents, market data, settings. Download a consistent snapshot any time.</p>
+    <a href="/backup/dealdesk.db" class="inline-block rounded-lg bg-indigo-600 px-4 py-2 text-white text-sm font-medium hover:bg-indigo-700">Download backup (.db)</a>
+
+    <hr class="my-4 border-slate-100">
+
+    <h3 class="font-medium text-slate-700 text-sm mb-1">Restore from a backup</h3>
+    <p class="text-xs text-slate-500 mb-2">Replaces the live workspace with an uploaded <code>.db</code>. The current
+      database is kept as a <code>.bak</code> first. Validated before it's swapped in.</p>
+    <form method="post" action="/backup/restore" enctype="multipart/form-data"
+          onsubmit="return confirm('Replace your entire workspace with this file? Your current DB is backed up to .bak first.')"
+          class="flex items-center gap-2">
+      <input type="file" name="file" accept=".db,application/x-sqlite3" required class="text-sm">
+      <button class="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50">Restore</button>
+    </form>
+  </div>
+
+  <div class="rounded-xl border bg-white p-5">
+    <h2 class="font-semibold text-slate-700 mb-1">Spreadsheet exports</h2>
+    <p class="text-sm text-slate-500 mb-3">CSV — opens in Excel or Google Sheets. Same column format the importers accept, so an export round-trips back in.</p>
+    <ul class="space-y-2 text-sm">
+      <li><a href="/export/deals.csv" class="text-indigo-600 hover:underline">All deals →</a> <span class="text-slate-400 text-xs">every pipeline</span></li>
+      <li><a href="/export/deals.csv?pipeline=acquisition" class="text-indigo-600 hover:underline">Acquisition deals →</a></li>
+      <li><a href="/export/deals.csv?pipeline=financing" class="text-indigo-600 hover:underline">Financing deals →</a></li>
+      <li><a href="/export/lenders.csv" class="text-indigo-600 hover:underline">Lender book →</a></li>
+      <li><a href="/export/contacts.csv" class="text-indigo-600 hover:underline">Contacts →</a></li>
+      <li><a href="/export/comps.csv" class="text-indigo-600 hover:underline">Loan comps →</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

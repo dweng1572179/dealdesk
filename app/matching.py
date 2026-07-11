@@ -5,7 +5,17 @@ explainable reasons. Optional AI pros/cons layer on top (ai.match_rationale)."""
 
 
 def _loan_size(deal: dict) -> int | None:
-    return deal.get("loan_amount") or deal.get("purchase_price")
+    """The loan the deal actually needs — what a lender's min/max box is measured
+    against. Prefer the stated loan; else size it from price × LTV (a 60%-LTV deal on a
+    $60M asset is a $36M loan, not a $60M one — using the price would wrongly bust a
+    $50M-max lender). Fall back to the bare price only when there's no LTV to size with."""
+    loan = deal.get("loan_amount")
+    if loan:
+        return loan
+    price, ltv = deal.get("purchase_price"), deal.get("ltv")
+    if price and ltv:
+        return round(price * ltv / 100)
+    return price
 
 
 def score(deal: dict, lender: dict) -> dict:
@@ -97,6 +107,15 @@ def demo() -> None:
     ranked = rank(deal, [good, wrong_type, too_big])
     assert [r["name"] for r in ranked] == ["Agency Shop"], ranked  # only the fit survives
     assert len(rank(deal, [good, wrong_type], include_disqualified=True)) == 2
+
+    # loan sizing: a deal with only price + LTV must be measured on the SIZED loan
+    # (price×LTV), not the raw price — else a fitting lender is wrongly disqualified.
+    price_deal = {"property_type": "Multifamily", "state": "TX",
+                  "purchase_price": 60_000_000, "ltv": 60.0}   # → $36M loan
+    mid = {"name": "Mid Fund", "property_types": ["Multifamily"], "geographies": ["US"],
+           "min_loan": 5_000_000, "max_loan": 50_000_000, "appetite": "active"}
+    assert not score(price_deal, mid)["disqualified"], "sized loan (36M) is within the 50M max"
+    assert _loan_size(price_deal) == 36_000_000, _loan_size(price_deal)
     print("matching.demo OK")
 
 

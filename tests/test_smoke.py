@@ -114,6 +114,63 @@ def run() -> None:
         from app.config import settings
         assert settings.monthly_budget_cents == 2500
 
+        # ── placements: shop the deal to a lender, change status, delete ──
+        p = c.post(f"/deal/{deal_id}/placement",
+                   data={"lender_name": "Shop Bank", "loan_amount": "9000000", "status": "quoted"})
+        assert p.status_code == 200 and "Shop Bank" in p.text
+        plc = db.list_placements(deal_id)
+        assert plc and plc[0]["status"] == "quoted", plc
+        pid = plc[0]["id"]
+        c.post(f"/placement/{pid}/status", data={"status": "selected"})
+        assert db.get_placement(pid)["status"] == "selected"
+        assert c.request("DELETE", f"/placement/{pid}").status_code == 200
+        assert not db.list_placements(deal_id)
+
+        # ── files vault: the upload stored the original bytes; serve them back ──
+        docs = db.list_documents(deal_id)
+        assert docs and docs[0]["size"], "document should have stored bytes now"
+        dl = c.get(f"/document/{docs[0]['id']}")
+        assert dl.status_code == 200 and b"9,000,000" in dl.content, "vault must serve original bytes"
+        assert c.request("DELETE", f"/document/{docs[0]['id']}").status_code == 200
+
+        # ── CSV import: deals + contacts (parity with lender importer) ──
+        deal_csv = b"name,pipeline,property_type,city,state,loan_amount\nCSV Deal,acquisition,Retail,Miami,FL,7500000\n"
+        di = c.post("/deals/import", files={"file": ("d.csv", deal_csv, "text/csv")}, follow_redirects=True)
+        assert di.status_code == 200 and any(d["name"] == "CSV Deal" for d in db.list_deals())
+        con_csv = b"name,role,email,company\nSam Sponsor,sponsor,sam@co.com,Sunbelt Holdings\n"
+        ci = c.post("/crm/contacts/import", files={"file": ("c.csv", con_csv, "text/csv")}, follow_redirects=True)
+        assert ci.status_code == 200
+        sam = db.contact_by_email("sam@co.com")
+        assert sam and sam["company_id"], "contact import should link/create the company"
+        assert any(co["name"] == "Sunbelt Holdings" for co in db.list_companies())
+
+        # a malformed CSV (oversized cell) must NOT 500 the importer
+        huge = b"name,notes\nBig Bank," + b"x" * 200000 + b"\n"
+        assert c.post("/crm/lenders/import", files={"file": ("l.csv", huge, "text/csv")},
+                      follow_redirects=True).status_code == 200
+
+        # ── exports + backup ──
+        ex = c.get("/export/deals.csv")
+        assert ex.status_code == 200 and "text/csv" in ex.headers["content-type"] and "Test Tower" in ex.text
+        assert c.get("/export/lenders.csv").status_code == 200
+        assert c.get("/export/contacts.csv").status_code == 200
+        bak = c.get("/backup/dealdesk.db")
+        assert bak.status_code == 200 and bak.content[:16] == b"SQLite format 3\x00", "backup must be a real sqlite file"
+
+        # ── regression: routes must degrade, not 500, on a bad/missing deal id ──
+        assert c.post("/deal/999999/stage", data={"stage": "LOI", "pipeline": "acquisition"}).status_code == 200
+        assert "Unknown deal" in c.post("/deal/999999/task", data={"body": "x"}).text
+        # a numeric-but-nonexistent deal_id on a contact must not trip the FK
+        c.post("/crm/contact", data={"name": "Ghost Ref", "deal_id": "999999"}, follow_redirects=True)
+        assert db.list_contacts(), "contact with bad deal_id should still be created (unlinked)"
+        # an unknown pipeline must not create a board-invisible deal
+        c.post("/deals", data={"name": "Bad Pipe", "pipeline": "zzz"}, follow_redirects=True)
+        assert all(d["pipeline"] in ("acquisition", "financing") for d in db.list_deals()), "pipeline must be validated"
+
+        # ── regression: settings test-connection buttons degrade with no key/inbox ──
+        assert "No Anthropic key" in c.post("/settings/test/anthropic").text
+        assert "No inbox connected" in c.post("/settings/test/email").text
+
     print("test_smoke OK")
 
 

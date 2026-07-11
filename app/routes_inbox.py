@@ -45,6 +45,10 @@ def inbox_sync(request: Request, _=Depends(require_auth)):
 @app.post("/deal/{deal_id}/email/send", response_class=HTMLResponse)
 def email_send(request: Request, deal_id: int, to: str = Form(...), subject: str = Form(...),
                body: str = Form(...), _=Depends(require_auth)):
+    if not db.get_deal(deal_id):
+        # check BEFORE sending — otherwise a bad deal_id delivers the mail, then the
+        # activity INSERT hits the FK and 500s, so the user is told it failed after it sent.
+        return templates.TemplateResponse("_error.html", {"request": request, "msg": "Unknown deal."})
     if not inbox.configured():
         return templates.TemplateResponse("_error.html", {
             "request": request, "msg": "Connect an inbox first — Settings → email address + App Password."})

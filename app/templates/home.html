@@ -34,19 +34,32 @@
     <div id="agent-spin" class="htmx-indicator text-sm text-slate-400 mt-3">Thinking…</div>
     <div id="agent-out" class="mt-4"></div>
 
-    <div class="mt-8 grid sm:grid-cols-3 gap-3">
+    {# ── Dashboard: headline figures + weighted pipeline ── #}
+    {% macro bigmoney(v) %}{% if v >= 1000000 %}${{ '%.1f'|format(v/1000000) }}M{% elif v >= 1000 %}${{ (v/1000)|round|int }}K{% elif v %}${{ '{:,}'.format(v) }}{% else %}$0{% endif %}{% endmacro %}
+    <div class="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
       <a href="/deals" class="rounded-xl border bg-white p-4 hover:border-indigo-400">
-        <div class="text-2xl font-semibold">{{ deal_count }}</div>
-        <div class="text-sm text-slate-500">deals in pipeline</div>
+        <div class="text-2xl font-semibold tabular-nums">{{ bigmoney(stats.totals.loan_total) }}</div>
+        <div class="text-sm text-slate-500">open pipeline</div>
       </a>
-      <a href="/deals?pipeline=financing" class="rounded-xl border bg-white p-4 hover:border-indigo-400">
-        <div class="text-2xl font-semibold">{{ pipelines.get('financing', 0) }}</div>
-        <div class="text-sm text-slate-500">financing</div>
+      <div class="rounded-xl border bg-white p-4" title="Loan $ weighted by each stage's close probability">
+        <div class="text-2xl font-semibold tabular-nums text-indigo-600">{{ bigmoney(stats.weighted_total) }}</div>
+        <div class="text-sm text-slate-500">weighted pipeline</div>
+      </div>
+      <a href="/deals" class="rounded-xl border bg-white p-4 hover:border-indigo-400">
+        <div class="text-2xl font-semibold tabular-nums">{{ stats.totals.deals }}</div>
+        <div class="text-sm text-slate-500">open deals</div>
       </a>
       <a href="/crm" class="rounded-xl border bg-white p-4 hover:border-indigo-400">
-        <div class="text-2xl font-semibold">{{ lender_count }}</div>
+        <div class="text-2xl font-semibold tabular-nums">{{ lender_count }}</div>
         <div class="text-sm text-slate-500">lenders in your book</div>
       </a>
+    </div>
+
+    {# ── Pipeline funnels: loan $ by stage, weighted overlay ── #}
+    <div class="mt-4 grid sm:grid-cols-2 gap-3">
+      {% for name, p in stats.per_pipeline.items() %}
+        {% with p=p, name=name %}{% include "_pipeline_chart.html" %}{% endwith %}
+      {% endfor %}
     </div>
 
     {% if open_tasks %}

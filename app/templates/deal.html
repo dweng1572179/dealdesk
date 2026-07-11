@@ -78,6 +78,9 @@
           <select name="property_type" class="mt-1 w-full rounded-lg border px-3 py-2">
             <option value="">—</option>{% for t in property_types %}<option {{ 'selected' if deal.property_type==t else '' }}>{{ t }}</option>{% endfor %}</select></label>
         {{ field("sponsor", "Sponsor", deal.sponsor) }}
+        <label><span class="text-xs text-slate-500">Company (borrower/sponsor org)</span>
+          <select name="company_id" class="mt-1 w-full rounded-lg border px-3 py-2">
+            <option value="">—</option>{% for co in companies %}<option value="{{ co.id }}" {{ 'selected' if deal.company_id == co.id else '' }}>{{ co.name }}</option>{% endfor %}</select></label>
         {{ field("address", "Address", deal.address) }}
         {{ field("city", "City", deal.city) }}
         {{ field("state", "State", deal.state) }}
@@ -108,6 +111,17 @@
       </form>
       <div id="tasks">{% include "_tasks.html" %}</div>
     </div>
+
+    <!-- placements: which lenders this deal was shopped to -->
+    <div class="rounded-xl border bg-white p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-700 text-sm">Placements <span class="font-normal text-xs text-slate-400">— where you've shopped this deal</span></h3>
+        <button class="text-xs text-indigo-600 hover:underline"
+                hx-get="/deal/{{ deal.id }}/match" hx-target="#panel" hx-indicator="#panel-spin"
+                onclick="document.getElementById('panel').scrollIntoView({behavior:'smooth'})">match lenders ↑</button>
+      </div>
+      <div id="placements">{% include "_placements.html" %}</div>
+    </div>
   </div>
 
   <!-- side: contacts, docs, activity -->
@@ -122,14 +136,7 @@
 
     <div class="rounded-xl border bg-white p-4">
       <h3 class="font-semibold text-slate-700 text-sm mb-2">Documents</h3>
-      {% if documents %}
-      <ul class="space-y-1.5 text-sm">
-        {% for d in documents %}
-        <li><span class="text-slate-700">{{ d.filename }}</span>
-          <span class="text-xs text-slate-400">· {{ d.created_at }}</span></li>
-        {% endfor %}
-      </ul>
-      {% else %}<p class="text-sm text-slate-400">No documents. Use “Upload document” above.</p>{% endif %}
+      <div id="documents">{% include "_documents.html" %}</div>
     </div>
 
     <div class="rounded-xl border bg-white p-4">

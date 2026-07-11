@@ -7,14 +7,12 @@ moat, here running on data you own:
 Lev's real edge is a live feed of 7,000+ lenders / 16,000+ loan comps / 34 rate
 benchmarks; the honest open trade is you maintain the reference data (seeded, then
 edit/import your own)."""
-import csv
-import io
 from io import BytesIO  # imported directly: the xlsx route has an `io` query param that shadows the module
 
 from fastapi import Depends, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 
-from . import ai, db, matching, underwriting
+from . import ai, csvimport, db, matching, underwriting
 from .app import app, base_ctx, require_auth, templates
 
 
@@ -32,8 +30,10 @@ def deal_match(request: Request, deal_id: int, _=Depends(require_auth)):
             "msg": "No lenders in your book yet — add them under CRM → Lenders (or import a CSV)."})
     ranked = matching.rank(deal, lenders)
     excluded = [r for r in matching.rank(deal, lenders, include_disqualified=True) if r["disqualified"]]
+    placed = {p["lender_name"] for p in db.list_placements(deal_id)}
     return templates.TemplateResponse("_match.html", {
-        "request": request, "deal": deal, "matches": ranked, "excluded": excluded})
+        "request": request, "deal": deal, "matches": ranked, "excluded": excluded,
+        "placed": placed})
 
 
 @app.post("/deal/{deal_id}/match/{lender_id}/why", response_class=HTMLResponse)
@@ -103,10 +103,8 @@ def _num(v):
 @app.post("/market/rates/import")
 async def rates_import(file: UploadFile, _=Depends(require_auth)):
     """CSV: name,value,delta_1d,delta_1m (upsert by name)."""
-    reader = csv.DictReader(io.StringIO((await file.read()).decode("utf-8-sig", errors="replace")))
     n = 0
-    for row in reader:
-        row = {(k or "").strip().lower(): v for k, v in row.items() if k is not None}
+    for row in csvimport.rows(await file.read()):
         name = (row.get("name") or "").strip()
         if name:
             db.upsert_base_rate(name, _num(row.get("value")),
@@ -118,15 +116,8 @@ async def rates_import(file: UploadFile, _=Depends(require_auth)):
 @app.post("/market/comps/import")
 async def comps_import(file: UploadFile, _=Depends(require_auth)):
     """CSV: asset_type,state,loan_purpose,capital_provider,ltv,rate,term_years,amort_years,recourse,issued,notes."""
-    reader = csv.DictReader(io.StringIO((await file.read()).decode("utf-8-sig", errors="replace")))
     n = 0
-    for row in reader:
-        # `if k is not None` drops csv.DictReader's restkey bucket (a LIST of the
-        # surplus cells when a row has extra columns), which would crash .strip().
-        row = {(k or "").strip().lower(): (v if isinstance(v, str) else "").strip()
-               for k, v in row.items() if k is not None}
-        if not any(row.values()):
-            continue
+    for row in csvimport.rows(await file.read()):
         db.add_loan_comp({
             "asset_type": row.get("asset_type"), "state": row.get("state"),
             "loan_purpose": row.get("loan_purpose"), "capital_provider": row.get("capital_provider"),

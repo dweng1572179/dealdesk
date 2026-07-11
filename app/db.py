@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS deal (
     property_type TEXT,
     address       TEXT, city TEXT, state TEXT,
     sponsor       TEXT,
+    company_id    INTEGER REFERENCES company(id) ON DELETE SET NULL,
     purchase_price INTEGER, loan_amount INTEGER,
     ltv REAL, interest_rate REAL, dscr REAL, cap_rate REAL, noi INTEGER,
     lender_name   TEXT,
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS contact (
     role       TEXT,            -- broker | lender | sponsor | attorney | other
     email      TEXT, phone TEXT,
     deal_id    INTEGER REFERENCES deal(id) ON DELETE SET NULL,
+    company_id INTEGER REFERENCES company(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_contact_email ON contact(email);
@@ -59,6 +61,9 @@ CREATE TABLE IF NOT EXISTS document (
     filename   TEXT NOT NULL,
     text       TEXT,          -- extracted plaintext (for the agent + re-extraction)
     terms_json TEXT,          -- ExtractedTerms as JSON
+    data       BLOB,          -- the original bytes, so the vault can serve it back
+    mime       TEXT,
+    size       INTEGER,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -119,7 +124,41 @@ CREATE TABLE IF NOT EXISTS company (          -- CRM Companies (borrowers, spons
     type       TEXT, location TEXT, website TEXT, notes TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Placements — which lenders a deal was shopped to and where each stands. A real
+-- Lev deal column. UNIQUE(deal_id, lender_name) makes "shop this deal to X"
+-- idempotent; lender_name is denormalized so a placement survives deleting the
+-- lender from your book (the history of who you called is not the lender's to erase).
+CREATE TABLE IF NOT EXISTS placement (
+    id          INTEGER PRIMARY KEY,
+    deal_id     INTEGER NOT NULL REFERENCES deal(id) ON DELETE CASCADE,
+    lender_id   INTEGER REFERENCES lender(id) ON DELETE SET NULL,
+    lender_name TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'shopped',  -- see models.PLACEMENT_STATUSES
+    loan_amount INTEGER, rate REAL, ltv REAL, term_years REAL, amort_years REAL,
+    notes       TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(deal_id, lender_name)
+);
+CREATE INDEX IF NOT EXISTS idx_placement_deal ON placement(deal_id);
 """
+
+# Columns added after v1 shipped. There is no migration framework and there won't be
+# one: SQLite's ALTER TABLE ADD COLUMN is idempotent enough when guarded by
+# PRAGMA table_info, and every addition here is nullable-with-default by construction.
+# ponytail: append-only column adds. If you ever need to DROP or retype a column,
+# that's the point where this earns a real migration tool — not before.
+_ADDED_COLUMNS = [
+    # (table, column, DDL type) — the file vault keeps the original bytes so a
+    # document can be viewed/downloaded, not just re-read as stripped text.
+    ("document", "data", "BLOB"),
+    ("document", "mime", "TEXT"),
+    ("document", "size", "INTEGER"),
+    # CRM links: contact -> company, deal -> company (the borrower/sponsor org).
+    ("contact", "company_id", "INTEGER REFERENCES company(id) ON DELETE SET NULL"),
+    ("deal", "company_id", "INTEGER REFERENCES company(id) ON DELETE SET NULL"),
+]
 
 
 @contextmanager
@@ -134,10 +173,33 @@ def get_conn():
         conn.close()
 
 
+def _migrate(conn) -> None:
+    """Add any _ADDED_COLUMNS missing from an existing DB. New installs get them from
+    SCHEMA's CREATE TABLE; upgrades get them here. Safe to run on every boot."""
+    for table, col, decl in _ADDED_COLUMNS:
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if not cols:            # table doesn't exist yet — SCHEMA will create it
+            continue
+        if col not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+
+
 def init_db() -> None:
     with get_conn() as conn:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        _migrate(conn)
+    # the DB holds the Anthropic key + email App Password in cleartext (settings table).
+    # sqlite creates the file 0644 (world-readable) under the default umask; tighten it
+    # to owner-only so a second local user can't read the secrets. Best-effort: a
+    # filesystem without POSIX perms (some Windows/mounted volumes) just skips it.
+    import os
+    for path in (settings.db_path, settings.db_path + "-wal", settings.db_path + "-shm"):
+        try:
+            if os.path.exists(path):
+                os.chmod(path, 0o600)
+        except OSError:  # pragma: no cover - non-POSIX filesystem
+            pass
 
 
 def _rows(cur) -> list[dict]:
@@ -147,8 +209,9 @@ def _rows(cur) -> list[dict]:
 # --- deals -------------------------------------------------------------------
 
 _DEAL_COLS = ["name", "pipeline", "stage", "deal_type", "property_type", "address",
-              "city", "state", "sponsor", "purchase_price", "loan_amount", "ltv",
-              "interest_rate", "dscr", "cap_rate", "noi", "lender_name", "status", "notes"]
+              "city", "state", "sponsor", "company_id", "purchase_price", "loan_amount",
+              "ltv", "interest_rate", "dscr", "cap_rate", "noi", "lender_name", "status",
+              "notes"]
 
 
 def create_deal(d: dict) -> int:
@@ -225,20 +288,33 @@ def deals_context(limit: int = 60) -> list[dict]:
 
 # --- contacts ----------------------------------------------------------------
 
+_CONTACT_COLS = ("name", "org", "role", "email", "phone", "deal_id", "company_id")
+
+
 def create_contact(c: dict) -> int:
+    cols = ", ".join(_CONTACT_COLS)
+    ph = ", ".join(f":{k}" for k in _CONTACT_COLS)
     with get_conn() as conn:
-        cur = conn.execute(
-            "INSERT INTO contact (name, org, role, email, phone, deal_id) "
-            "VALUES (:name, :org, :role, :email, :phone, :deal_id) RETURNING id",
-            {k: c.get(k) for k in ("name", "org", "role", "email", "phone", "deal_id")})
+        cur = conn.execute(f"INSERT INTO contact ({cols}) VALUES ({ph}) RETURNING id",
+                           {k: c.get(k) for k in _CONTACT_COLS})
         return cur.fetchone()["id"]
 
 
-def list_contacts(deal_id: int | None = None) -> list[dict]:
+def list_contacts(deal_id: int | None = None, company_id: int | None = None) -> list[dict]:
+    """Contacts, joined to their company + deal names so the CRM can show the links."""
+    q = ("SELECT c.*, co.name AS company_name, d.name AS deal_name FROM contact c "
+         "LEFT JOIN company co ON co.id = c.company_id "
+         "LEFT JOIN deal d ON d.id = c.deal_id")
+    conds, args = [], []
+    if deal_id is not None:
+        conds.append("c.deal_id = ?"); args.append(deal_id)
+    if company_id is not None:
+        conds.append("c.company_id = ?"); args.append(company_id)
+    if conds:
+        q += " WHERE " + " AND ".join(conds)
+    q += " ORDER BY c.name"
     with get_conn() as conn:
-        if deal_id is None:
-            return _rows(conn.execute("SELECT * FROM contact ORDER BY name"))
-        return _rows(conn.execute("SELECT * FROM contact WHERE deal_id = ? ORDER BY name", (deal_id,)))
+        return _rows(conn.execute(q, tuple(args)))
 
 
 def contact_by_email(email: str) -> dict | None:
@@ -301,21 +377,57 @@ def delete_lender(lender_id: int) -> None:
 
 # --- documents ---------------------------------------------------------------
 
-def save_document(deal_id: int | None, filename: str, text: str, terms: dict | None) -> int:
+def save_document(deal_id: int | None, filename: str, text: str, terms: dict | None,
+                  data: bytes | None = None, mime: str | None = None) -> int:
+    """Store a document. `data` is the ORIGINAL bytes — kept so the vault can serve the
+    file back (view/download), not just the stripped text. Blobs live in the same
+    SQLite file on purpose: one file is the whole workspace, so one backup is complete."""
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO document (deal_id, filename, text, terms_json) VALUES (?, ?, ?, ?) RETURNING id",
-            (deal_id, filename, text, json.dumps(terms) if terms else None))
+            "INSERT INTO document (deal_id, filename, text, terms_json, data, mime, size) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (deal_id, filename, text, json.dumps(terms) if terms else None,
+             data, mime, len(data) if data else None))
         return cur.fetchone()["id"]
 
 
 def list_documents(deal_id: int) -> list[dict]:
+    # never SELECT data here — listing a deal would pull every blob into memory.
     with get_conn() as conn:
         rows = _rows(conn.execute(
-            "SELECT id, filename, terms_json, created_at FROM document WHERE deal_id = ? "
-            "ORDER BY id DESC", (deal_id,)))
+            "SELECT id, filename, terms_json, mime, size, created_at FROM document "
+            "WHERE deal_id = ? ORDER BY id DESC", (deal_id,)))
     for r in rows:
         r["terms"] = json.loads(r["terms_json"]) if r.get("terms_json") else None
+    return rows
+
+
+def get_document(doc_id: int) -> dict | None:
+    """The full row INCLUDING the blob — only for serving one file back."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM document WHERE id = ?", (doc_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def delete_document(doc_id: int) -> int | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT deal_id FROM document WHERE id = ?", (doc_id,)).fetchone()
+        if not row:
+            return None
+        conn.execute("DELETE FROM document WHERE id = ?", (doc_id,))
+        return row["deal_id"]
+
+
+def document_texts(deal_id: int, limit: int = 6, chars: int = 4000) -> list[dict]:
+    """Extracted text of a deal's documents, for the agent to answer questions over
+    (the open version of Lev's per-deal RAG). ponytail: newest-N whole documents,
+    truncated — no chunking, no embeddings, no vector store. A single deal's papers fit
+    in a modern context window. Add retrieval only when a deal outgrows the window."""
+    with get_conn() as conn:
+        rows = _rows(conn.execute(
+            "SELECT id, filename, substr(text, 1, ?) AS text FROM document "
+            "WHERE deal_id = ? AND text IS NOT NULL AND text != '' ORDER BY id DESC LIMIT ?",
+            (chars, deal_id, limit)))
     return rows
 
 
@@ -434,10 +546,166 @@ def upsert_company(c: dict) -> int:
 
 
 def list_companies() -> list[dict]:
+    """Companies with their link counts — a company is only useful in a CRM if you can
+    see what hangs off it."""
     with get_conn() as conn:
-        return _rows(conn.execute("SELECT * FROM company ORDER BY name"))
+        return _rows(conn.execute(
+            "SELECT co.*, "
+            "  (SELECT COUNT(*) FROM contact c WHERE c.company_id = co.id) AS contact_count, "
+            "  (SELECT COUNT(*) FROM deal d WHERE d.company_id = co.id) AS deal_count "
+            "FROM company co ORDER BY co.name"))
+
+
+def get_company(company_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM company WHERE id = ?", (company_id,)).fetchone()
+    return dict(row) if row else None
 
 
 def delete_company(company_id: int) -> None:
     with get_conn() as conn:
         conn.execute("DELETE FROM company WHERE id = ?", (company_id,))
+
+
+# --- placements (which lenders a deal was shopped to) -------------------------
+
+_PLACEMENT_COLS = ["deal_id", "lender_id", "lender_name", "status", "loan_amount",
+                   "rate", "ltv", "term_years", "amort_years", "notes"]
+
+
+def upsert_placement(p: dict) -> int:
+    """Shop a deal to a lender (or update that placement). Idempotent per
+    (deal_id, lender_name): re-shopping the same lender updates the row in place
+    rather than stacking duplicates. Only non-None fields overwrite on conflict, so
+    'mark as quoted' doesn't blank out terms captured earlier."""
+    row = {k: p.get(k) for k in _PLACEMENT_COLS}
+    row["status"] = row.get("status") or "shopped"
+    if not row.get("lender_name"):
+        raise ValueError("placement needs a lender_name")
+    cols = ", ".join(_PLACEMENT_COLS)
+    ph = ", ".join(f":{c}" for c in _PLACEMENT_COLS)
+    # COALESCE(excluded.x, placement.x): a NULL in the new row keeps the stored value.
+    updates = ", ".join(f"{c} = COALESCE(excluded.{c}, placement.{c})"
+                        for c in _PLACEMENT_COLS if c not in ("deal_id", "lender_name"))
+    with get_conn() as conn:
+        cur = conn.execute(
+            f"INSERT INTO placement ({cols}) VALUES ({ph}) "
+            f"ON CONFLICT(deal_id, lender_name) DO UPDATE SET {updates}, "
+            f"updated_at = datetime('now') RETURNING id", row)
+        return cur.fetchone()["id"]
+
+
+def list_placements(deal_id: int) -> list[dict]:
+    with get_conn() as conn:
+        return _rows(conn.execute(
+            "SELECT * FROM placement WHERE deal_id = ? "
+            "ORDER BY CASE status WHEN 'selected' THEN 0 WHEN 'quoted' THEN 1 "
+            "WHEN 'shopped' THEN 2 ELSE 3 END, lender_name", (deal_id,)))
+
+
+def get_placement(placement_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM placement WHERE id = ?", (placement_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def delete_placement(placement_id: int) -> int | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT deal_id FROM placement WHERE id = ?", (placement_id,)).fetchone()
+        if not row:
+            return None
+        conn.execute("DELETE FROM placement WHERE id = ?", (placement_id,))
+        return row["deal_id"]
+
+
+# --- dashboard aggregates ----------------------------------------------------
+
+def pipeline_summary() -> list[dict]:
+    """Per (pipeline, stage): deal count and total loan $. Aggregated in SQL rather
+    than pulled into Python — it's the one query the dashboard hits on every load.
+    Only `open` deals: a closed/dead deal is not pipeline."""
+    with get_conn() as conn:
+        return _rows(conn.execute(
+            "SELECT pipeline, stage, COUNT(*) AS deals, "
+            "  COALESCE(SUM(loan_amount), 0) AS loan_total, "
+            "  COALESCE(SUM(purchase_price), 0) AS price_total "
+            "FROM deal WHERE status = 'open' GROUP BY pipeline, stage"))
+
+
+def deal_totals() -> dict:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS deals, COALESCE(SUM(loan_amount), 0) AS loan_total, "
+            "  COALESCE(SUM(purchase_price), 0) AS price_total "
+            "FROM deal WHERE status = 'open'").fetchone()
+    return dict(row)
+
+
+def demo() -> None:
+    import os
+    import tempfile
+    settings.db_path = os.path.join(tempfile.mkdtemp(), "db.db")
+
+    # --- an OLD (v1) DB must survive the upgrade with its rows intact. The v1
+    # `deal`/`document` tables have every column EXCEPT the post-v1 additions
+    # (deal.company_id, document.data/mime/size) — those are what _migrate adds. -
+    with get_conn() as conn:
+        conn.executescript(
+            "CREATE TABLE deal (id INTEGER PRIMARY KEY, name TEXT NOT NULL, "
+            "  pipeline TEXT NOT NULL DEFAULT 'acquisition', stage TEXT NOT NULL, "
+            "  deal_type TEXT, property_type TEXT, address TEXT, city TEXT, state TEXT, "
+            "  sponsor TEXT, purchase_price INTEGER, loan_amount INTEGER, ltv REAL, "
+            "  interest_rate REAL, dscr REAL, cap_rate REAL, noi INTEGER, lender_name TEXT, "
+            "  status TEXT DEFAULT 'open', notes TEXT, "
+            "  created_at TEXT NOT NULL DEFAULT (datetime('now')), "
+            "  updated_at TEXT NOT NULL DEFAULT (datetime('now')));"
+            "CREATE TABLE document (id INTEGER PRIMARY KEY, deal_id INTEGER, "
+            "  filename TEXT NOT NULL, text TEXT, terms_json TEXT, "
+            "  created_at TEXT NOT NULL DEFAULT (datetime('now')));"
+            "INSERT INTO deal (name, stage, loan_amount) VALUES ('Legacy Deal', 'LOI', 1000000);"
+            "INSERT INTO document (deal_id, filename, text) VALUES (1, 'old.pdf', 'hi');")
+    init_db()   # CREATE TABLE IF NOT EXISTS is a no-op on `deal`; _migrate must ALTER it
+    with get_conn() as conn:
+        dcols = {r["name"] for r in conn.execute("PRAGMA table_info(document)")}
+        assert {"data", "mime", "size"} <= dcols, dcols
+        assert "company_id" in {r["name"] for r in conn.execute("PRAGMA table_info(deal)")}
+    assert get_deal(1)["name"] == "Legacy Deal", "migration dropped existing rows"
+    init_db()   # second boot must be a clean no-op (no duplicate-column error)
+
+    # --- documents keep their original bytes ---------------------------------
+    did = create_deal({"name": "Blob Test", "pipeline": "acquisition"})
+    doc_id = save_document(did, "ts.pdf", "text", {"ltv": 65}, data=b"%PDF-1.7 body", mime="application/pdf")
+    assert get_document(doc_id)["data"] == b"%PDF-1.7 body"
+    assert get_document(doc_id)["size"] == 13
+    assert "data" not in list_documents(did)[0], "list_documents must not pull blobs"
+    assert document_texts(did)[0]["filename"] == "ts.pdf"
+
+    # --- placements are idempotent per (deal, lender) ------------------------
+    p1 = upsert_placement({"deal_id": did, "lender_name": "Agency Shop", "rate": 6.5})
+    p2 = upsert_placement({"deal_id": did, "lender_name": "Agency Shop", "status": "quoted"})
+    assert p1 == p2, "re-shopping the same lender must update, not duplicate"
+    plc = list_placements(did)
+    assert len(plc) == 1 and plc[0]["status"] == "quoted"
+    # the COALESCE upsert must NOT blank the rate captured on the first touch
+    assert plc[0]["rate"] == 6.5, plc[0]
+    upsert_placement({"deal_id": did, "lender_name": "Life Co", "status": "passed"})
+    # 'quoted' outranks 'passed' in the list ordering
+    assert [p["lender_name"] for p in list_placements(did)] == ["Agency Shop", "Life Co"]
+    assert delete_placement(plc[0]["id"]) == did
+    assert len(list_placements(did)) == 1
+
+    # --- dashboard aggregates ------------------------------------------------
+    update_deal(did, {"loan_amount": 5_000_000, "stage": "LOI"})
+    tot = deal_totals()
+    assert tot["deals"] == 2 and tot["loan_total"] == 6_000_000, tot   # 1M legacy + 5M
+    rows = {(r["pipeline"], r["stage"]): r for r in pipeline_summary()}
+    assert rows[("acquisition", "LOI")]["loan_total"] == 6_000_000, rows
+    # a closed deal is not pipeline
+    update_deal(did, {"status": "closed"})
+    assert deal_totals()["loan_total"] == 1_000_000, deal_totals()
+
+    print("db.demo (migration + placements + aggregates) OK")
+
+
+if __name__ == "__main__":
+    demo()

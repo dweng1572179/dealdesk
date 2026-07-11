@@ -6,7 +6,14 @@
   <title>{% block title %}DealDesk{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <style>.htmx-indicator{opacity:0;transition:opacity .2s}.htmx-request .htmx-indicator{opacity:1}.htmx-request.htmx-indicator{opacity:1}</style>
+  <style>
+    .htmx-indicator{opacity:0;transition:opacity .2s}.htmx-request .htmx-indicator{opacity:1}.htmx-request.htmx-indicator{opacity:1}
+    /* Chart tokens — theme-aware. One indigo hue at two intensities: the light track
+       is the raw figure, the dark fill the weighted/risk-adjusted one (sequential,
+       single hue = magnitude). Ready for dark mode (P2); today the app renders light. */
+    .viz{--bar-track:#c7d2fe;--bar-fill:#4f46e5;--viz-grid:#e2e8f0}
+    @media (prefers-color-scheme: dark){.viz{--bar-track:#3730a3;--bar-fill:#818cf8;--viz-grid:#334155}}
+  </style>
 </head>
 <body class="h-full bg-slate-50 text-slate-800">
   <header class="border-b bg-white sticky top-0 z-10">
@@ -18,6 +25,7 @@
           <a href="/deals" class="hover:text-slate-900">Deals</a>
           <a href="/crm" class="hover:text-slate-900">CRM</a>
           <a href="/market" class="hover:text-slate-900">Market</a>
+          <a href="/backup" class="hover:text-slate-900">Backup</a>
         </nav>
       </div>
       <div class="flex items-center gap-4 text-sm">

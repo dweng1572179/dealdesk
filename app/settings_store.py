@@ -47,3 +47,21 @@ def save(updates: dict[str, str]) -> None:
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (name, str(value)))
     for name, value in updates.items():
         _apply(name, str(value))
+
+
+# --- internal flags (not user-facing config; the `setting` table doubles as a KV) ----
+# ponytail: reuse the setting table for a couple of app flags (e.g. "seeded") rather
+# than add a table. _apply() ignores keys that aren't real settings, so a flag can't
+# clobber the config object.
+
+def get_flag(key: str) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM setting WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_flag(key: str, value: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO setting (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))

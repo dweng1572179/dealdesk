@@ -12,9 +12,28 @@
       {% endfor %}
     </div>
   </div>
-  <button onclick="document.getElementById('new-deal').classList.toggle('hidden')"
-          class="rounded-lg bg-indigo-600 px-4 py-2 text-white text-sm font-medium hover:bg-indigo-700">+ New deal</button>
+  <div class="flex items-center gap-2">
+    <a href="/export/deals.csv{{ '?pipeline=' + pipeline if pipeline else '' }}"
+       class="rounded-lg border px-3 py-2 text-sm text-slate-600 hover:bg-slate-50" title="Export this pipeline to CSV">Export</a>
+    <button onclick="document.getElementById('import-deals').classList.toggle('hidden')"
+            class="rounded-lg border px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Import CSV</button>
+    <button onclick="document.getElementById('new-deal').classList.toggle('hidden')"
+            class="rounded-lg bg-indigo-600 px-4 py-2 text-white text-sm font-medium hover:bg-indigo-700">+ New deal</button>
+  </div>
 </div>
+
+{% if imported is defined and imported is not none %}
+<div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">Imported {{ imported }} deal(s).</div>
+{% endif %}
+
+<form id="import-deals" method="post" action="/deals/import" enctype="multipart/form-data"
+      class="hidden mb-5 rounded-xl border bg-white p-4 flex flex-wrap items-center gap-3 text-sm">
+  <div class="flex-1 min-w-[240px]">
+    <span class="text-xs text-slate-500">CSV columns: name (required), pipeline, stage, property_type, city, state, sponsor, purchase_price, loan_amount, ltv, interest_rate, dscr, cap_rate, noi, lender_name, notes.</span>
+  </div>
+  <input type="file" name="file" accept=".csv" required class="text-xs">
+  <button class="rounded-lg bg-indigo-600 px-3 py-1.5 text-white hover:bg-indigo-700">Import</button>
+</form>
 
 <form id="new-deal" method="post" action="/deals" class="hidden mb-5 rounded-xl border bg-white p-4 grid sm:grid-cols-3 gap-3">
   <input type="hidden" name="pipeline" value="{{ pipeline }}">

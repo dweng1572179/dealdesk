@@ -56,3 +56,40 @@ async def settings_save(request: Request, _=Depends(require_auth)):
             updates[name] = v
     settings_store.save(updates)
     return templates.TemplateResponse("settings.html", _ctx(request, saved=True))
+
+
+@app.post("/settings/test/anthropic", response_class=HTMLResponse)
+def test_anthropic(request: Request, _=Depends(require_auth)):
+    """Cheapest possible live call (1 token) to prove the key + model actually work.
+    Bills a token against your Anthropic account, not the local budget meter — a
+    connection test shouldn't consume the monthly cap."""
+    if not ai.available():
+        return templates.TemplateResponse("_error.html", {
+            "request": request, "msg": "No Anthropic key set — paste one above and Save first."})
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=settings.anthropic_api_key, timeout=30.0)
+        resp = client.messages.create(model=settings.llm_model, max_tokens=1,
+                                       messages=[{"role": "user", "content": "hi"}])
+        model = getattr(resp, "model", settings.llm_model)
+        return templates.TemplateResponse("_flash.html", {
+            "request": request, "msg": f"Anthropic key works — reached {model}."})
+    except Exception as e:  # noqa: BLE001 — surface the real API error to the user
+        return templates.TemplateResponse("_error.html", {
+            "request": request, "msg": f"Anthropic test failed: {type(e).__name__}: {e}"})
+
+
+@app.post("/settings/test/email", response_class=HTMLResponse)
+def test_email(request: Request, _=Depends(require_auth)):
+    """Log in to IMAP and SMTP (no message sent) to prove the inbox credentials +
+    host/port actually connect."""
+    if not inbox.configured():
+        return templates.TemplateResponse("_error.html", {
+            "request": request, "msg": "No inbox connected — add your address + App Password above and Save first."})
+    try:
+        inbox.test_connection()
+    except Exception as e:  # noqa: BLE001
+        return templates.TemplateResponse("_error.html", {
+            "request": request, "msg": f"Email test failed: {e}"})
+    return templates.TemplateResponse("_flash.html", {
+        "request": request, "msg": f"Inbox connected — IMAP {settings.imap_host} and SMTP {settings.smtp_host} both authenticated."})

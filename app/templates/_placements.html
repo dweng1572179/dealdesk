@@ -1,0 +1,49 @@
+{# Placements — which lenders this deal was shopped to and where each stands. Rendered
+   into #placements; each status change / delete re-renders this partial.
+   Expects: deal_id, placements (list), statuses (list). #}
+{% macro money(v) %}{% if v %}${{ '{:,.0f}'.format(v) }}{% endif %}{% endmacro %}
+{% set dot = {"shopped":"bg-slate-400","quoted":"bg-indigo-500","selected":"bg-emerald-500","passed":"bg-amber-500","dead":"bg-rose-400"} %}
+{% if not placements %}
+  <p class="text-sm text-slate-400">No placements yet. Match lenders below, then “shop” this deal to them — or add one by hand.</p>
+{% else %}
+<ul class="divide-y text-sm">
+  {% for p in placements %}
+  <li class="py-2 flex items-start justify-between gap-3 group">
+    <div class="min-w-0">
+      <div class="font-medium flex items-center gap-1.5">
+        <span class="inline-block h-2 w-2 rounded-full {{ dot.get(p.status, 'bg-slate-400') }}"></span>{{ p.lender_name }}
+      </div>
+      <div class="text-xs text-slate-500">
+        {{ [money(p.loan_amount) + ' loan' if p.loan_amount else '',
+            (p.rate|string) + '% rate' if p.rate else '',
+            (p.ltv|string) + '% LTV' if p.ltv else '',
+            (p.term_years|int|string) + 'yr term' if p.term_years else '']|select|join(' · ') }}
+        {% if p.notes %}<div class="text-slate-400 mt-0.5">{{ p.notes }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5 shrink-0">
+      <select class="rounded border text-xs px-1.5 py-1 text-slate-600 capitalize"
+              hx-post="/placement/{{ p.id }}/status" hx-target="#placements" hx-trigger="change" name="status">
+        {% for s in statuses %}<option {{ 'selected' if s == p.status else '' }}>{{ s }}</option>{% endfor %}
+      </select>
+      <button class="text-xs text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100"
+              hx-delete="/placement/{{ p.id }}" hx-target="#placements" hx-confirm="Remove this placement?">✕</button>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<details class="mt-3">
+  <summary class="cursor-pointer text-xs text-indigo-600 hover:underline">+ add a placement by hand</summary>
+  <form class="mt-2 grid grid-cols-2 gap-2 text-sm" hx-post="/deal/{{ deal_id }}/placement"
+        hx-target="#placements" hx-on::after-request="if(event.detail.successful) this.reset()">
+    <input name="lender_name" required placeholder="Lender name" class="col-span-2 rounded border px-2 py-1.5">
+    <input name="loan_amount" placeholder="Loan $" class="rounded border px-2 py-1.5">
+    <input name="rate" placeholder="Rate %" class="rounded border px-2 py-1.5">
+    <input name="ltv" placeholder="LTV %" class="rounded border px-2 py-1.5">
+    <input name="term_years" placeholder="Term (yrs)" class="rounded border px-2 py-1.5">
+    <input name="notes" placeholder="Notes" class="col-span-2 rounded border px-2 py-1.5">
+    <button class="col-span-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-white text-sm hover:bg-indigo-700">Add placement</button>
+  </form>
+</details>

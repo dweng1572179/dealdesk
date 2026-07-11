@@ -10,12 +10,28 @@
     {% endif %}
     {% for m in matches %}
     <div class="rounded-lg border p-3">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between gap-2">
         <div class="font-medium">{{ m.name }}
           <span class="ml-1 text-xs px-2 py-0.5 rounded-full {{ 'bg-emerald-100 text-emerald-800' if m.score >= 70 else 'bg-amber-100 text-amber-800' }}">{{ m.score }}/100</span>
         </div>
-        <button class="text-xs text-indigo-600 hover:underline"
-                hx-post="/deal/{{ deal.id }}/match/{{ m.id }}/why" hx-target="#why-{{ m.id }}" hx-indicator="#why-spin-{{ m.id }}">AI pros/cons</button>
+        <div class="flex items-center gap-2 shrink-0">
+          <button class="text-xs text-indigo-600 hover:underline"
+                  hx-post="/deal/{{ deal.id }}/match/{{ m.id }}/why" hx-target="#why-{{ m.id }}" hx-indicator="#why-spin-{{ m.id }}">AI pros/cons</button>
+          {% if m.name in placed %}
+          <span class="text-xs text-emerald-600" title="Already a placement on this deal">✓ shopped</span>
+          {% else %}
+          {# shop this deal to this lender: prefill the placement with the deal's own terms #}
+          <form hx-post="/deal/{{ deal.id }}/placement" hx-target="#placements"
+                hx-on::after-request="if(event.detail.successful){this.querySelector('button').textContent='✓ shopped';this.querySelector('button').disabled=true}">
+            <input type="hidden" name="lender_name" value="{{ m.name }}">
+            <input type="hidden" name="lender_id" value="{{ m.id }}">
+            <input type="hidden" name="loan_amount" value="{{ deal.loan_amount or '' }}">
+            <input type="hidden" name="ltv" value="{{ deal.ltv or '' }}">
+            <input type="hidden" name="rate" value="{{ deal.interest_rate or '' }}">
+            <button class="text-xs rounded border border-indigo-300 text-indigo-600 px-2 py-0.5 hover:bg-indigo-50">+ shop</button>
+          </form>
+          {% endif %}
+        </div>
       </div>
       <ul class="mt-1 text-xs text-slate-500 list-disc list-inside">
         {% for r in m.reasons %}<li>{{ r }}</li>{% endfor %}

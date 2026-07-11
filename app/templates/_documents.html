@@ -1,0 +1,25 @@
+{# Deal document vault — view/download/delete. Rendered in deal.html and returned on
+   delete. Expects: deal_id, documents (list, from db.list_documents — no blob). #}
+{% macro size(n) %}{% if n and n >= 1048576 %}{{ '%.1f'|format(n/1048576) }} MB{% elif n and n >= 1024 %}{{ (n/1024)|round|int }} KB{% elif n %}{{ n }} B{% endif %}{% endmacro %}
+{% if not documents %}
+  <p class="text-sm text-slate-400">No documents. Use “Upload document” above to add a term sheet, OM, or email.</p>
+{% else %}
+<ul class="divide-y text-sm">
+  {% for d in documents %}
+  <li class="py-2 flex items-start justify-between gap-2 group">
+    <div class="min-w-0">
+      {% if d.size %}
+      <a href="/document/{{ d.id }}" target="_blank" rel="noopener"
+         class="text-slate-700 hover:text-indigo-600 hover:underline truncate">{{ d.filename }}</a>
+      {% else %}
+      {# a document saved before the vault stored bytes — no file to serve #}
+      <span class="text-slate-700 truncate" title="Saved before file storage — re-upload to view">{{ d.filename }}</span>
+      {% endif %}
+      <div class="text-xs text-slate-400">{{ d.created_at }}{% if d.size %} · {{ size(d.size) }}{% endif %}{% if d.terms %} · terms extracted{% endif %}</div>
+    </div>
+    <button class="text-xs text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 shrink-0"
+            hx-delete="/document/{{ d.id }}" hx-target="#documents" hx-confirm="Delete this document?">✕</button>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

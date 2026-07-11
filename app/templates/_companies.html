@@ -8,6 +8,9 @@
     <div class="min-w-0">
       <div class="font-medium">{{ c.name }}{% if c.type %} <span class="text-xs text-slate-400">· {{ c.type }}</span>{% endif %}</div>
       <div class="text-xs text-slate-500 truncate">{{ [c.location, c.website]|select|join(' · ') }}</div>
+      {% if c.contact_count or c.deal_count %}
+      <div class="text-xs text-slate-400">{% if c.deal_count %}{{ c.deal_count }} deal{{ '' if c.deal_count == 1 else 's' }}{% endif %}{% if c.contact_count and c.deal_count %} · {% endif %}{% if c.contact_count %}{{ c.contact_count }} contact{{ '' if c.contact_count == 1 else 's' }}{% endif %}</div>
+      {% endif %}
     </div>
     <button class="text-xs text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100"
             hx-delete="/company/{{ c.id }}" hx-target="#companies" hx-confirm="Delete this company?">✕</button>

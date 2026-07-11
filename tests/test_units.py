@@ -5,7 +5,7 @@ import tempfile
 
 os.environ["DB_PATH"] = os.path.join(tempfile.mkdtemp(), "units.db")
 
-from app import ai, budget, docparse, inbox, matching, underwriting  # noqa: E402
+from app import ai, budget, csvimport, db, docparse, inbox, matching, underwriting  # noqa: E402
 
 
 def run() -> None:
@@ -15,6 +15,8 @@ def run() -> None:
     docparse.demo()
     inbox.demo()
     budget.demo()
+    csvimport.demo()
+    db.demo()
     print("test_units OK")
 
 

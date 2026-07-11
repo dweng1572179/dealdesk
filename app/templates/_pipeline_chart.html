@@ -1,0 +1,37 @@
+{# Pipeline funnel — one horizontal bar per stage, loan $ by stage. Two-tone: the
+   light bar is the total loan at that stage, the darker overlay is the weighted value
+   (loan × close-probability). Pure CSS, no chart lib, no JS. Single hue = magnitude;
+   stage identity is carried by the row label, so no categorical color is needed.
+   Expects: `p` (a per_pipeline entry), `name` (pipeline name). #}
+{% macro money(v) %}{% if v >= 1000000 %}${{ '%.1f'|format(v/1000000) }}M{% elif v >= 1000 %}${{ (v/1000)|round|int }}K{% elif v %}${{ '{:,}'.format(v) }}{% else %}$0{% endif %}{% endmacro %}
+<div class="viz rounded-xl border bg-white p-4">
+  <div class="flex items-baseline justify-between mb-3">
+    <h3 class="font-semibold text-slate-700 text-sm capitalize">{{ name }} pipeline</h3>
+    <span class="text-xs text-slate-400">{{ p.deals }} deal{{ '' if p.deals == 1 else 's' }} · {{ money(p.loan_total) }}</span>
+  </div>
+  {% if p.loan_total %}
+  <div class="space-y-2">
+    {% for s in p.stages %}
+    <div class="grid grid-cols-[7.5rem_1fr_auto] items-center gap-2 text-xs"
+         title="{{ s.stage }} — {{ s.deals }} deal(s), {{ money(s.loan_total) }} loan, {{ money(s.weighted) }} weighted @ {{ s.weight }}%">
+      <span class="text-slate-500 truncate">{{ s.stage }}</span>
+      <div class="relative h-4 rounded bg-slate-100 overflow-hidden">
+        {# total-loan bar (light) #}
+        <div class="absolute inset-y-0 left-0 rounded"
+             style="width: {{ (s.loan_total / p.max_loan * 100)|round(1) }}%; background: var(--bar-track, #c7d2fe)"></div>
+        {# weighted bar (dark), scaled to the SAME max so it reads as a fraction of the light bar #}
+        <div class="absolute inset-y-0 left-0 rounded"
+             style="width: {{ (s.weighted / p.max_loan * 100)|round(1) }}%; background: var(--bar-fill, #4f46e5)"></div>
+      </div>
+      <span class="text-slate-600 tabular-nums text-right w-12">{% if s.loan_total %}{{ money(s.loan_total) }}{% else %}<span class="text-slate-300">—</span>{% endif %}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="mt-3 flex items-center gap-4 text-xs text-slate-400">
+    <span class="flex items-center gap-1"><span class="inline-block h-2.5 w-2.5 rounded-sm" style="background: var(--bar-track, #c7d2fe)"></span>loan $</span>
+    <span class="flex items-center gap-1"><span class="inline-block h-2.5 w-2.5 rounded-sm" style="background: var(--bar-fill, #4f46e5)"></span>weighted ({{ money(p.weighted) }})</span>
+  </div>
+  {% else %}
+  <p class="text-sm text-slate-400 py-6 text-center">No open deals with a loan amount in this pipeline yet.</p>
+  {% endif %}
+</div>

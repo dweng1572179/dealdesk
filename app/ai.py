@@ -119,15 +119,13 @@ def extract_terms(text: str) -> dict:
         return _extract_rules(text)
 
 
-# number + optional k/m/bn suffix. No 4-digit minimum (that missed "$8.4M"); every
-# use is anchored to a keyword ("loan amount", "purchase price"), so short raw
-# numbers can't be grabbed out of context.
-_MONEY = r"\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|mm|m|bn|b|million|thousand|billion)?\b"
+# number + optional k/m/bn suffix. No 4-digit minimum (that missed "$8.4M").
+_NUM_UNIT = r"(\d[\d,]*(?:\.\d+)?)\s*(k|mm|m|bn|b|million|thousand|billion)?"
 
 
-def _money(m) -> int:
-    n = float(m.group(1).replace(",", ""))
-    unit = (m.group(2) or "").lower()
+def _scale(num_str: str, unit: str) -> int:
+    n = float(num_str.replace(",", ""))
+    unit = (unit or "").lower()
     if unit in ("k", "thousand"):
         n *= 1_000
     elif unit in ("m", "mm", "million"):
@@ -137,24 +135,57 @@ def _money(m) -> int:
     return round(n)
 
 
+def _find_money(t: str, keyword: str, window: int = 80) -> int | None:
+    """First MONEY-SHAPED figure within `window` chars after `keyword`. Money-shaped =
+    has a $, a thousands comma, or a magnitude suffix (k/m/bn) — that's what stops a
+    bare "65" (from "65% LTV, not to exceed $12.5M") being read as a $65 loan, while a
+    real "$12,500,000" or "$12.5M" still matches. A figure directly followed by % is a
+    percentage, never money, so it's skipped."""
+    for km in re.finditer(keyword, t):
+        seg = t[km.end():km.end() + window]
+        for mm in re.finditer(_NUM_UNIT, seg):
+            num_str, unit = mm.group(1), (mm.group(2) or "")
+            if seg[mm.end():mm.end() + 1] == "%":       # a percentage, not dollars
+                continue
+            had_dollar = "$" in seg[max(0, mm.start() - 2):mm.start() + 1]
+            if had_dollar or unit or "," in num_str:    # money-shaped
+                return _scale(num_str, unit)
+    return None
+
+
 def _extract_rules(text: str) -> dict:
-    """Regex fallback — grabs the numbers investors always put in a term sheet."""
+    """Regex fallback — grabs the numbers investors always put in a term sheet. Best
+    effort: labeled loudly as approximate. Hardened against the classic false grabs
+    (a % read as dollars, a cap rate read as the coupon, an index spread read as the
+    all-in rate)."""
     t = text.lower()
     out: dict = {}
-    if m := re.search(r"loan amount\D{0,12}" + _MONEY, t):
-        out["loan_amount"] = _money(m)
-    if m := re.search(r"(?:purchase price|acquisition price)\D{0,12}" + _MONEY, t):
-        out["purchase_price"] = _money(m)
+    if (v := _find_money(t, r"loan amount")) is not None:
+        out["loan_amount"] = v
+    if (v := _find_money(t, r"purchase price|acquisition price")) is not None:
+        out["purchase_price"] = v
     if m := re.search(r"\bltv\D{0,10}(\d{1,3}(?:\.\d+)?)\s*%?", t):
         out["ltv"] = float(m.group(1))
     if m := re.search(r"\bdscr\D{0,10}(\d(?:\.\d+)?)", t):
         out["dscr"] = float(m.group(1))
-    # (?<!cap ) so "cap rate 5.5%" can't satisfy the bare "rate" alternative and
-    # bleed the cap rate into interest_rate when it appears first in the doc.
-    if m := re.search(r"(?:interest rate|coupon|(?<!cap )rate)\D{0,10}(\d{1,2}(?:\.\d+)?)\s*%", t):
-        out["interest_rate"] = float(m.group(1))
-    if m := re.search(r"cap rate\D{0,10}(\d{1,2}(?:\.\d+)?)\s*%", t):
+    # cap rate first, flexible separator ("cap rate" / "cap-rate" / "cap_rate"), so we
+    # can then keep it from being double-counted as the coupon below.
+    if m := re.search(r"cap[\s_\-]*rate\D{0,10}(\d{1,2}(?:\.\d+)?)\s*%", t):
         out["cap_rate"] = float(m.group(1))
+    # interest rate: prefer an ALL-IN / coupon figure (floating sheets read "SOFR +
+    # 3.50% (all-in 8.85%)" — the spread comes first, so keying on 'rate' would grab
+    # 3.50). Bare 'rate' is the last resort and never the cap rate we just parsed.
+    rate = None
+    if m := re.search(r"all[\s\-]?in(?:\s+rate)?\D{0,12}(\d{1,2}(?:\.\d+)?)\s*%", t):
+        rate = float(m.group(1))
+    elif m := re.search(r"(?:interest rate|coupon|note rate)\D{0,10}(\d{1,2}(?:\.\d+)?)\s*%", t):
+        rate = float(m.group(1))
+    elif m := re.search(r"\brate\D{0,10}(\d{1,2}(?:\.\d+)?)\s*%", t):
+        cand = float(m.group(1))
+        if cand != out.get("cap_rate"):   # a bare 'rate' that IS the cap rate is not the coupon
+            rate = cand
+    if rate is not None:
+        out["interest_rate"] = rate
     out["summary"] = "(No Anthropic key — extracted with regex; add a key for full accuracy.)"
     return out
 
@@ -210,6 +241,9 @@ def match_rationale(deal: dict, lender: dict) -> str | None:
                 messages=[{"role": "user", "content":
                            f"Deal: {json.dumps(deal, default=str)}\nLender: {json.dumps(lender, default=str)}"}])
         return _text(resp)
+    except budget.BudgetExceeded as e:
+        # the key IS set — the cap is the reason. Say so, don't imply a missing key.
+        return f"⚠️ {e}"
     except Exception as e:  # noqa: BLE001
         log.warning("match_rationale failed: %s", e)
         return None
@@ -270,6 +304,20 @@ def demo() -> None:
     # cap-rate-first ordering must NOT leak the cap rate into interest_rate
     t3 = _extract_rules("Cap rate 5.5%. Interest rate 7.25%. Loan Amount $20,000,000")
     assert t3.get("interest_rate") == 7.25 and t3.get("cap_rate") == 5.5, t3
+
+    # a % right after the keyword must NOT be read as a dollar figure; the real
+    # money-shaped number ($12.5M) is the loan.
+    t4 = _extract_rules("LOAN AMOUNT: 65% of appraised value, not to exceed $12,500,000")
+    assert t4.get("loan_amount") == 12_500_000, t4
+    # cap rate with a non-space separator must not bleed into interest_rate
+    t5 = _extract_rules("Cap-Rate: 5.5%. Loan amount $10,000,000")
+    assert t5.get("cap_rate") == 5.5 and "interest_rate" not in t5, t5
+    # floating-rate sheet: take the all-in coupon, not the index spread
+    t6 = _extract_rules("Interest Rate: SOFR + 3.50% (all-in 8.85%). Loan amount $30,000,000")
+    assert t6.get("interest_rate") == 8.85, t6
+    # a bare number with no money shape is not a loan amount
+    t7 = _extract_rules("Loan amount to be determined; target 70% LTV")
+    assert "loan_amount" not in t7, t7
 
     ans = _agent_rules("which office deals in dallas", [
         {"name": "Main St Tower", "stage": "LOI", "pipeline": "acquisition",

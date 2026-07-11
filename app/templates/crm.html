@@ -13,11 +13,13 @@
 <section class="mb-8">
   <div class="flex items-center justify-between mb-3">
     <h2 class="font-semibold text-slate-700">Lender book <span class="text-sm text-slate-400">({{ lenders|length }})</span></h2>
-    <form method="post" action="/crm/lenders/import" enctype="multipart/form-data"
-          class="flex items-center gap-2 text-sm">
-      <input type="file" name="file" accept=".csv" required class="text-xs">
-      <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50">Import CSV</button>
-    </form>
+    <div class="flex items-center gap-2 text-sm">
+      <a href="/export/lenders.csv" class="rounded-lg border px-3 py-1.5 text-slate-600 hover:bg-slate-50">Export</a>
+      <form method="post" action="/crm/lenders/import" enctype="multipart/form-data" class="flex items-center gap-2">
+        <input type="file" name="file" accept=".csv" required class="text-xs">
+        <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50">Import CSV</button>
+      </form>
+    </div>
   </div>
 
   <details class="mb-3 rounded-xl border bg-white p-4">
@@ -48,19 +50,35 @@
 <section>
   <div class="flex items-center justify-between mb-3">
     <h2 class="font-semibold text-slate-700">Contacts <span class="text-sm text-slate-400">({{ contacts|length }})</span></h2>
+    <div class="flex items-center gap-2 text-sm">
+      <a href="/export/contacts.csv" class="rounded-lg border px-3 py-1.5 text-slate-600 hover:bg-slate-50">Export</a>
+      <form method="post" action="/crm/contacts/import" enctype="multipart/form-data" class="flex items-center gap-2">
+        <input type="file" name="file" accept=".csv" required class="text-xs">
+        <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50">Import CSV</button>
+      </form>
+    </div>
   </div>
-  <form method="post" action="/crm/contact" class="mb-3 rounded-xl border bg-white p-4 grid sm:grid-cols-5 gap-3 text-sm">
+
+  {% if imported_contacts is not none %}
+  <div class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">Imported {{ imported_contacts }} contact(s).</div>
+  {% endif %}
+
+  <form method="post" action="/crm/contact" class="mb-3 rounded-xl border bg-white p-4 grid sm:grid-cols-6 gap-3 text-sm">
     <label><span class="text-xs text-slate-500">Name*</span><input name="name" required class="mt-1 w-full rounded-lg border px-3 py-2"></label>
     <label><span class="text-xs text-slate-500">Org</span><input name="org" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
     <label><span class="text-xs text-slate-500">Role</span>
       <select name="role" class="mt-1 w-full rounded-lg border px-3 py-2">
         {% for r in ["broker","lender","sponsor","attorney","other"] %}<option>{{ r }}</option>{% endfor %}</select></label>
     <label><span class="text-xs text-slate-500">Email</span><input name="email" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+    <label><span class="text-xs text-slate-500">Company</span>
+      <select name="company_id" class="mt-1 w-full rounded-lg border px-3 py-2">
+        <option value="">—</option>{% for co in companies %}<option value="{{ co.id }}">{{ co.name }}</option>{% endfor %}</select></label>
     <label><span class="text-xs text-slate-500">Deal</span>
       <select name="deal_id" class="mt-1 w-full rounded-lg border px-3 py-2">
         <option value="">—</option>{% for d in deals %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></label>
-    <div class="sm:col-span-5"><button class="rounded-lg bg-indigo-600 px-4 py-2 text-white font-medium hover:bg-indigo-700">Add contact</button></div>
+    <div class="sm:col-span-6"><button class="rounded-lg bg-indigo-600 px-4 py-2 text-white font-medium hover:bg-indigo-700">Add contact</button></div>
   </form>
+  <p class="mb-3 text-xs text-slate-400">CSV columns: name (required), org, role, email, phone, company. A company name links to (or creates) that company.</p>
   <div id="contacts" class="rounded-xl border bg-white p-4">{% include "_contacts.html" %}</div>
 </section>
 

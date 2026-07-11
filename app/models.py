@@ -20,9 +20,32 @@ PROPERTY_TYPES = ["Multifamily", "Office", "Industrial", "Retail", "Mixed-Use",
                   "Hospitality", "Land", "Other"]
 LENDER_APPETITE = ["active", "selective", "paused"]
 
+# Where a deal stands with one lender you took it to (Lev's "Placements" column).
+PLACEMENT_STATUSES = ["shopped", "quoted", "passed", "selected", "dead"]
+
+# Probability a deal at this stage actually closes — the multiplier behind "weighted
+# pipeline". ponytail: a hardcoded heuristic ladder, not a learned model. It's the
+# standard CRM convention and there is no close-history to fit against on day one;
+# make it per-user config once someone's own hit-rate disagrees with it.
+STAGE_WEIGHTS: dict[str, int] = {
+    # acquisition
+    "Sourcing": 10, "Underwriting": 20, "LOI": 40, "Under Contract": 60,
+    "Due Diligence": 75,
+    # financing
+    "Intake": 10, "Packaging": 25, "In Market": 40, "Term Sheets": 60, "Selected": 80,
+    # shared tail
+    "Closing": 90, "Closed": 100, "Dead": 0,
+}
+
 
 def default_stage(pipeline: str) -> str:
     return PIPELINES.get(pipeline, PIPELINES["acquisition"])[0]
+
+
+def stage_weight(stage: str) -> int:
+    """Close probability (0-100) for a stage. Unknown stage -> 50 (no information is
+    not the same as no chance)."""
+    return STAGE_WEIGHTS.get(stage, 50)
 
 
 class ExtractedTerms(BaseModel):

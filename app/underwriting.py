@@ -45,20 +45,24 @@ def compute(deal: dict, amort_years: int = 30, noi_growth_pct: float = 3.0,
         cap = round(noi / price * 100, 2)
 
     ads = annual_debt_service(loan, rate, amort_years, interest_only)
+    # has_ds: debt service is KNOWN (could legitimately be 0.0 on a 0% interest-only
+    # loan). Guarding on truthiness alone blanks a real $0 debt service; guard division
+    # on `ads` (can't divide by 0 → DSCR undefined) but presence-guard the subtractions.
+    has_ds = ads is not None
     dscr = round(noi / ads, 2) if noi and ads else None
     debt_yield = round(noi / loan * 100, 2) if noi and loan else None
     # presence-guard so an all-cash deal (loan == 0) reports equity == full price
     equity = price - loan if price is not None and loan is not None else None
     # equity > 0 so an over-leveraged deal shows "—", not a sign-flipped positive return
-    coc = round((noi - ads) / equity * 100, 2) if noi and ads and equity and equity > 0 else None
+    coc = round((noi - ads) / equity * 100, 2) if noi and has_ds and equity and equity > 0 else None
 
     projection = []
     if noi:
         for y in range(1, hold_years + 1):
             noi_y = round(noi * (1 + noi_growth_pct / 100) ** (y - 1))
-            cf = round(noi_y - ads) if ads else None
+            cf = round(noi_y - ads) if has_ds else None
             projection.append({
-                "year": y, "noi": noi_y, "debt_service": round(ads) if ads else None,
+                "year": y, "noi": noi_y, "debt_service": round(ads) if has_ds else None,
                 "cash_flow": cf, "dscr": round(noi_y / ads, 2) if ads else None})
 
     return {
@@ -66,7 +70,7 @@ def compute(deal: dict, amort_years: int = 30, noi_growth_pct: float = 3.0,
                         "hold_years": hold_years, "interest_only": interest_only},
         "purchase_price": price, "loan_amount": loan, "ltv": ltv, "interest_rate": rate,
         "cap_rate": cap, "noi": noi, "equity": equity,
-        "annual_debt_service": round(ads) if ads else None,
+        "annual_debt_service": round(ads) if has_ds else None,
         "dscr": dscr, "debt_yield_pct": debt_yield, "cash_on_cash_pct": coc,
         "projection": projection,
     }
@@ -163,6 +167,15 @@ def demo() -> None:
     # all-cash deal (loan 0) → equity = full price, no phantom returns
     cash = compute({"purchase_price": 5_000_000, "loan_amount": 0, "noi": 300_000})
     assert cash["equity"] == 5_000_000 and cash["cash_on_cash_pct"] is None, cash
+
+    # 0% interest-only loan → real $0 debt service (not None): cash flow = NOI, and
+    # cash-on-cash is computable; DSCR stays None (coverage is infinite, not a number).
+    zio = compute({"purchase_price": 10_000_000, "loan_amount": 5_000_000,
+                   "interest_rate": 0.0, "noi": 500_000}, interest_only=True)
+    assert zio["annual_debt_service"] == 0, zio
+    assert zio["projection"][0]["debt_service"] == 0, zio["projection"][0]
+    assert zio["projection"][0]["cash_flow"] == zio["projection"][0]["noi"], zio["projection"][0]
+    assert zio["cash_on_cash_pct"] == 10.0, zio   # 500k / 5M equity
 
     # over-leveraged (equity < 0) must NOT report a positive cash-on-cash
     over = compute({"purchase_price": 10_000_000, "loan_amount": 12_000_000,

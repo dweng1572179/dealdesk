@@ -10,7 +10,10 @@
     <div class="min-w-0">
       <div class="font-medium">{{ c.name }}{% if c.role %} <span class="text-xs text-slate-400">· {{ c.role }}</span>{% endif %}</div>
       <div class="text-xs text-slate-500 truncate">
-        {{ [c.org, c.email, c.phone]|select|join(' · ') }}
+        {{ [c.email, c.phone]|select|join(' · ') }}
+      </div>
+      <div class="text-xs text-slate-400 truncate">
+        {% if c.company_name %}<span class="text-slate-500">{{ c.company_name }}</span>{% elif c.org %}{{ c.org }}{% endif %}{% if c.deal_name %} · <a href="/deal/{{ c.deal_id }}" class="hover:underline">{{ c.deal_name }}</a>{% endif %}
       </div>
     </div>
     <button class="text-xs text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100"

@@ -50,6 +50,39 @@ def send(to: str, subject: str, body: str) -> None:
         s.send_message(msg)
 
 
+def test_connection() -> None:
+    """Log in to both IMAP and SMTP without sending or reading anything — proves the
+    credentials + host/port before the user relies on them. Raises on any failure."""
+    if not configured():
+        raise RuntimeError("Email not configured — set your address + App Password in Settings.")
+    imap = imaplib.IMAP4_SSL(settings.imap_host, settings.imap_port)
+    try:
+        imap.login(settings.email_user, settings.email_password)
+    finally:
+        try:
+            imap.logout()
+        except Exception:  # noqa: BLE001
+            pass
+    # SMTP: same 465-implicit-TLS / else-STARTTLS split as send(), login only (NOOP, no mail).
+    if settings.smtp_port == 465:
+        smtp = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=30)
+    else:
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30)
+        smtp.starttls()
+    with smtp as s:
+        s.login(settings.email_user, settings.email_password)
+
+
+def _safe_decode(payload: bytes, charset: str | None) -> str:
+    """Decode bytes with the declared charset, tolerating a bogus/unregistered codec
+    name — errors='replace' does NOT catch that (Python raises LookupError before
+    decoding), and one weird message must not abort the whole sync."""
+    try:
+        return payload.decode(charset or "utf-8", errors="replace")
+    except (LookupError, TypeError):
+        return payload.decode("utf-8", errors="replace")
+
+
 def _body_text(msg: email.message.Message) -> str:
     """First text/plain part, ignoring attachments; falls back to any text part."""
     if msg.is_multipart():
@@ -58,10 +91,10 @@ def _body_text(msg: email.message.Message) -> str:
                     part.get("Content-Disposition", "")):
                 payload = part.get_payload(decode=True)
                 if payload:
-                    return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+                    return _safe_decode(payload, part.get_content_charset())
         return ""
     payload = msg.get_payload(decode=True)
-    return payload.decode(msg.get_content_charset() or "utf-8", errors="replace") if payload else ""
+    return _safe_decode(payload, msg.get_content_charset()) if payload else ""
 
 
 def fetch(limit: int = 15) -> list[dict]:
@@ -110,6 +143,10 @@ def demo() -> None:
     # header decoding survives RFC2047 + junk
     assert _decode("=?utf-8?q?Hello?=") == "Hello"
     assert _decode(None) == ""
+    # an unregistered charset must not raise (errors='replace' doesn't cover a bad
+    # codec NAME) — it falls back to utf-8 rather than aborting the whole sync.
+    assert _safe_decode(b"hi there", "x-unknown-8bit") == "hi there"
+    assert _safe_decode(b"\xff\xfe", "totally-made-up") != ""
     print("inbox.demo OK")
 
 

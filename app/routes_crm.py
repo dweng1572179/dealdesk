@@ -1,23 +1,21 @@
 """CRM directory — contacts (brokers/lenders/sponsors) and your lender book. Lenders
 import from CSV so you can bring a real capital-provider list (the open answer to
 Lev's 7,000 lender profiles: you own the data)."""
-import csv
-import io
-
-from fastapi import Depends, Form, Request
+from fastapi import Depends, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi import UploadFile
 
-from . import db
+from . import csvimport, db
 from .app import app, base_ctx, require_auth, templates
 from .models import LENDER_APPETITE, PROPERTY_TYPES
 
 
-def _crm_ctx(request: Request, imported: int | None = None) -> dict:
+def _crm_ctx(request: Request, imported: int | None = None,
+             imported_contacts: int | None = None) -> dict:
     ctx = base_ctx(request)
     ctx |= {"contacts": db.list_contacts(), "lenders": db.list_lenders(),
             "companies": db.list_companies(), "property_types": PROPERTY_TYPES,
-            "appetites": LENDER_APPETITE, "deals": db.list_deals(), "imported": imported}
+            "appetites": LENDER_APPETITE, "deals": db.list_deals(),
+            "imported": imported, "imported_contacts": imported_contacts}
     return ctx
 
 
@@ -29,13 +27,37 @@ def crm(request: Request, _=Depends(require_auth)):
 @app.post("/crm/contact")
 def contact_add(name: str = Form(...), org: str = Form(""), role: str = Form("other"),
                 email: str = Form(""), phone: str = Form(""), deal_id: str = Form(""),
-                _=Depends(require_auth)):
+                company_id: str = Form(""), _=Depends(require_auth)):
     if name.strip():
+        # only attach to a deal / company that actually exists — a stale id would trip
+        # the FK (ON DELETE SET NULL still rejects an INSERT of a nonexistent parent).
+        did = int(deal_id) if deal_id.strip().isdigit() and db.get_deal(int(deal_id)) else None
+        cid = int(company_id) if company_id.strip().isdigit() and db.get_company(int(company_id)) else None
         db.create_contact({"name": name.strip(), "org": org.strip() or None,
                            "role": role, "email": email.strip() or None,
-                           "phone": phone.strip() or None,
-                           "deal_id": int(deal_id) if deal_id.strip().isdigit() else None})
+                           "phone": phone.strip() or None, "deal_id": did, "company_id": cid})
     return RedirectResponse("/crm", status_code=303)
+
+
+@app.post("/crm/contacts/import", response_class=HTMLResponse)
+async def contacts_import(request: Request, file: UploadFile, _=Depends(require_auth)):
+    """CSV import of contacts — parity with the lender importer. Columns: name (req),
+    org, role, email, phone. A `company` column links to (or creates) that company by
+    name, so importing a contact list also seeds the Companies directory."""
+    n = 0
+    for row in csvimport.rows(await file.read()):
+        name = row.get("name")
+        if not name:
+            continue
+        company = row.get("company") or row.get("org")
+        company_id = db.upsert_company({"name": company}) if company else None
+        db.create_contact({
+            "name": name, "org": row.get("org") or company or None,
+            "role": (row.get("role") or "other").lower(), "email": row.get("email") or None,
+            "phone": row.get("phone") or None, "deal_id": None, "company_id": company_id})
+        n += 1
+    db.add_activity("system", f"Imported {n} contact(s) from {file.filename}")
+    return templates.TemplateResponse("crm.html", _crm_ctx(request, imported_contacts=n))
 
 
 @app.post("/crm/company")
@@ -56,14 +78,15 @@ def company_delete(request: Request, company_id: int, _=Depends(require_auth)):
 
 
 @app.delete("/contact/{contact_id}", response_class=HTMLResponse)
-def contact_delete(request: Request, contact_id: int, deal_id: str = Form(""),
-                   _=Depends(require_auth)):
-    # A deal page's Contacts panel is deal-scoped and shares the #contacts target,
-    # so re-render with the same scope it was rendered at (the button rides deal_id
-    # via hx-vals); the /crm page sends none -> global list. Re-pass deal_id so the
-    # swapped buttons keep their scope on a second consecutive delete.
+def contact_delete(request: Request, contact_id: int, _=Depends(require_auth)):
+    # A deal page's Contacts panel is deal-scoped and shares the #contacts target, so
+    # re-render at the same scope it was rendered at (the button rides deal_id via
+    # hx-vals). htmx 2.x adds hx-vals to the URL for DELETE (methodsThatUseUrlParams
+    # includes 'delete'), so read it from the query string, not the body — reading it
+    # as a Form field silently lost the scope and dumped the global list into the panel.
+    deal_id = (request.query_params.get("deal_id") or "").strip()
     db.delete_contact(contact_id)
-    did = int(deal_id) if deal_id.strip().isdigit() else None
+    did = int(deal_id) if deal_id.isdigit() else None
     return templates.TemplateResponse(
         "_contacts.html", {"request": request, "contacts": db.list_contacts(did),
                            "deal_id": deal_id if did else ""})
@@ -112,14 +135,8 @@ async def lenders_import(request: Request, file: UploadFile, _=Depends(require_a
     """CSV import. Columns: name, contact_name, email, phone, loan_types, property_types,
     geographies, min_loan, max_loan, max_ltv, appetite, notes. List columns are
     comma/semicolon-separated. Upsert by name, so re-importing updates in place."""
-    raw = (await file.read()).decode("utf-8-sig", errors="replace")
-    reader = csv.DictReader(io.StringIO(raw))
     n = 0
-    for row in reader:
-        # `if k is not None` drops csv.DictReader's restkey bucket (a LIST of surplus
-        # cells on an over-wide row), which would otherwise crash .strip().
-        row = {(k or "").strip().lower(): (v if isinstance(v, str) else "").strip()
-               for k, v in row.items() if k is not None}
+    for row in csvimport.rows(await file.read()):
         name = row.get("name")
         if not name:
             continue

@@ -34,6 +34,21 @@
       Gmail/Outlook need an <b>App Password</b>, not your login password.</p>
   </form>
 
+  <div class="md:col-span-2 order-last">
+    <div class="rounded-xl border bg-white p-4">
+      <h3 class="font-semibold text-slate-700 mb-1 text-sm">Test connections</h3>
+      <p class="text-xs text-slate-400 mb-3">Save first, then verify the credentials actually reach the service.</p>
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" class="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50"
+                hx-post="/settings/test/anthropic" hx-target="#test-result" hx-indicator="#test-spin">Test Anthropic key</button>
+        <button type="button" class="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50"
+                hx-post="/settings/test/email" hx-target="#test-result" hx-indicator="#test-spin">Test inbox (IMAP + SMTP)</button>
+        <span id="test-spin" class="htmx-indicator text-xs text-slate-400">testing…</span>
+      </div>
+      <div id="test-result" class="mt-3"></div>
+    </div>
+  </div>
+
   <div class="space-y-4">
     <div class="rounded-xl border bg-white p-4">
       <h3 class="font-semibold text-slate-700 mb-2 text-sm">Active now</h3>
