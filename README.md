@@ -14,12 +14,18 @@ data stays on your box.
 
 ## Screenshots
 
-> _Add your own once you've loaded data — the repo is the storefront. Drop PNGs in
-> `docs/` and reference them here; `[Home]`, `[A financing pipeline board]`, `[A deal
-> with its underwriting model + placements]`, and `[Market]` are the four that sell it._
+**Dashboard** — Cortex agent, weighted pipeline, per-stage $ charts, activity feed:
 
-<!-- ![Dashboard](docs/dashboard.png) -->
-<!-- ![Deal detail](docs/deal.png) -->
+![Dashboard](docs/dashboard.png)
+
+**Deal detail** — the Cortex action bar and a live underwriting model (DSCR, debt yield, exit cap, IRR):
+
+![Deal detail](docs/deal.png)
+
+**Market** (capital-markets reference — your lender directory, base rates, closed-loan comps) and the **pipeline board** with per-card stage moves:
+
+![Market](docs/market.png)
+![Deals board](docs/deals.png)
 
 ## 60-second setup
 
