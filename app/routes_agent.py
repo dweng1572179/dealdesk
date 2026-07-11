@@ -14,7 +14,7 @@ def agent_ask(request: Request, question: str = Form(...), _=Depends(require_aut
     if not question:
         return templates.TemplateResponse(
             "_error.html", {"request": request, "msg": "Ask something about your deals."})
-    answer = ai.agent_reply(question, db.deals_context())
+    answer = ai.agent_act(question, db.deals_context())
     db.add_activity("agent", f"Q: {question[:120]}")
     return templates.TemplateResponse(
         "_agent_reply.html", {"request": request, "question": question, "answer": answer})

@@ -46,7 +46,7 @@ monthly cap).
 
 | Lev | DealDesk |
 | --- | --- |
-| "Cortex" multi-agent router (chat over deals/files) | **Cortex** agent over a live snapshot of your deals — ask, prioritize, draft |
+| "Cortex" multi-agent router (chat over deals/files) | **Cortex** — a tool-using agent over your deals: from chat it creates/updates deals, runs an underwriting model, matches lenders, reads a deal's docs, and drafts email (one BYO model + tools, not a multi-model system) |
 | Build Excel underwriting models (pro forma, DSCR, debt sizing) | **Build underwriting model** → a real `.xlsx` (sources/uses, debt sizing, DSCR, pro forma) from the deal, no key needed |
 | Term extraction from documents (~95%) | Upload a term sheet/OM → structured terms → apply to the deal |
 | Market moat: 7,287 lenders · 34 base rates · 16,133 loan comps | **Market** page — your own lender Directory, Base rates, and Recent-terms comps (seeded, then edit/import) |

@@ -274,6 +274,200 @@ def deal_memo(deal: dict, contacts: list[dict], documents: list[dict]) -> str:
         return _memo_template(deal)
 
 
+# --- 6. Cortex agent with tool use (the real router→specialist behavior) -----
+# The agent can DO things from chat — create/update deals, run an underwriting model,
+# match lenders, draft email, add tasks, and read a deal's documents (RAG). Manual
+# tool-use loop (no beta SDK dependency); adaptive thinking so it plans tool calls.
+# With no key it degrades to the keyword-search fallback, same as agent_reply.
+
+AGENT_MAX_STEPS = 8   # ponytail: cap the loop; a CRE question rarely needs more turns
+
+_AGENT_TOOLS_SYS = (
+    "You are Cortex, DealDesk's agent for a commercial-real-estate dealmaker. You can "
+    "answer questions AND take actions on the user's workspace with the given tools: "
+    "look up deals, create or update a deal, run an underwriting model, match a deal to "
+    "the user's lender book, read a deal's uploaded documents, draft an email, and add "
+    "tasks. Prefer a tool over guessing — call list_deals to find a deal's id before "
+    "acting on it by name. Use ONLY real data from the tools; never invent deals, "
+    "numbers, or counterparties. Money is whole dollars. draft_email only DRAFTS — it "
+    "does not send; tell the user the draft is ready to review. Be concise and specific, "
+    "cite deal names, and confirm what you changed."
+)
+
+# ponytail: the deal fields the agent may write. Kept in sync with db._DEAL_COLS minus
+# server-managed columns; a tool input outside this set is ignored by db.update_deal.
+_AGENT_DEAL_FIELDS = {
+    "name": {"type": "string"}, "pipeline": {"type": "string", "enum": ["acquisition", "financing"]},
+    "property_type": {"type": "string"}, "city": {"type": "string"}, "state": {"type": "string"},
+    "sponsor": {"type": "string"}, "deal_type": {"type": "string"}, "lender_name": {"type": "string"},
+    "purchase_price": {"type": "integer"}, "loan_amount": {"type": "integer"}, "noi": {"type": "integer"},
+    "ltv": {"type": "number"}, "interest_rate": {"type": "number"}, "dscr": {"type": "number"},
+    "cap_rate": {"type": "number"}, "notes": {"type": "string"},
+}
+
+
+def _agent_tools() -> list[dict]:
+    return [
+        {"name": "list_deals", "description": "List the user's open deals (id, name, pipeline, "
+         "stage, type, location, prices, loan terms). Call this first to find a deal's id.",
+         "input_schema": {"type": "object", "properties": {}}},
+        {"name": "get_deal", "description": "Get every field of one deal by id.",
+         "input_schema": {"type": "object", "properties": {"deal_id": {"type": "integer"}},
+                          "required": ["deal_id"]}},
+        {"name": "create_deal", "description": "Create a new deal. Only `name` is required; set "
+         "any known fields. pipeline is 'acquisition' or 'financing'.",
+         "input_schema": {"type": "object", "properties": _AGENT_DEAL_FIELDS, "required": ["name"]}},
+        {"name": "update_deal", "description": "Update fields on an existing deal by id. Only the "
+         "fields you pass change.",
+         "input_schema": {"type": "object",
+                          "properties": {"deal_id": {"type": "integer"}, **_AGENT_DEAL_FIELDS},
+                          "required": ["deal_id"]}},
+        {"name": "run_underwriting", "description": "Compute the underwriting model for a deal — "
+         "DSCR, debt yield, cash-on-cash, and a hold-period IRR + equity multiple. Deterministic "
+         "finance math off the deal's fields.",
+         "input_schema": {"type": "object", "properties": {
+             "deal_id": {"type": "integer"}, "amort_years": {"type": "integer"},
+             "hold_years": {"type": "integer"}, "interest_only": {"type": "boolean"}},
+             "required": ["deal_id"]}},
+        {"name": "match_lenders", "description": "Rank the user's lender book against a deal, with "
+         "a fit score and reasons per lender.",
+         "input_schema": {"type": "object", "properties": {"deal_id": {"type": "integer"}},
+                          "required": ["deal_id"]}},
+        {"name": "read_deal_documents", "description": "Read the extracted text of a deal's uploaded "
+         "documents (term sheets, OMs, emails) to answer questions about them.",
+         "input_schema": {"type": "object", "properties": {"deal_id": {"type": "integer"}},
+                          "required": ["deal_id"]}},
+        {"name": "draft_email", "description": "Draft (do NOT send) an email for a deal. Returns the "
+         "subject and body for the user to review and send.",
+         "input_schema": {"type": "object", "properties": {
+             "deal_id": {"type": "integer"}, "intent": {"type": "string"},
+             "to_name": {"type": "string"}}, "required": ["deal_id", "intent"]}},
+        {"name": "add_task", "description": "Add a task to a deal. `due` is an optional YYYY-MM-DD date.",
+         "input_schema": {"type": "object", "properties": {
+             "deal_id": {"type": "integer"}, "body": {"type": "string"}, "due": {"type": "string"}},
+             "required": ["deal_id", "body"]}},
+    ]
+
+
+def run_agent_tool(name: str, inp: dict) -> str:
+    """Execute one agent tool against the workspace and return a text result. Pure
+    dispatch over db/underwriting/matching — deterministic and testable without a key.
+    Any tool error is returned as text (with a marker) so the agent can recover rather
+    than the whole turn 500-ing."""
+    from . import db, matching, underwriting
+    try:
+        if name == "list_deals":
+            return json.dumps(db.deals_context(), default=str)
+        if name == "get_deal":
+            d = db.get_deal(int(inp["deal_id"]))
+            return json.dumps(d, default=str) if d else "ERROR: no deal with that id."
+        if name == "create_deal":
+            fields = {k: inp[k] for k in _AGENT_DEAL_FIELDS if k in inp}
+            fields["name"] = (inp.get("name") or "Untitled deal")
+            if fields.get("pipeline") not in ("acquisition", "financing"):
+                fields.pop("pipeline", None)
+            did = db.create_deal(fields)
+            db.add_activity("agent", f"Cortex created deal {fields['name']}", did)
+            return f"Created deal id={did} '{fields['name']}'."
+        if name == "update_deal":
+            did = int(inp["deal_id"])
+            if not db.get_deal(did):
+                return "ERROR: no deal with that id."
+            fields = {k: inp[k] for k in _AGENT_DEAL_FIELDS if k in inp}
+            if not fields:
+                return "ERROR: no updatable fields given."
+            db.update_deal(did, fields)
+            db.add_activity("agent", f"Cortex updated {', '.join(fields)} on deal {did}", did)
+            return f"Updated deal {did}: {', '.join(fields)}."
+        if name == "run_underwriting":
+            d = db.get_deal(int(inp["deal_id"]))
+            if not d:
+                return "ERROR: no deal with that id."
+            m = underwriting.compute(
+                d, amort_years=max(1, int(inp.get("amort_years", 30))),
+                hold_years=min(max(1, int(inp.get("hold_years", 5))), 30),
+                interest_only=bool(inp.get("interest_only", False)))
+            keep = ("purchase_price", "loan_amount", "equity", "annual_debt_service", "dscr",
+                    "debt_yield_pct", "cash_on_cash_pct", "returns")
+            return json.dumps({k: m[k] for k in keep if k in m}, default=str)
+        if name == "match_lenders":
+            d = db.get_deal(int(inp["deal_id"]))
+            if not d:
+                return "ERROR: no deal with that id."
+            ranked = matching.rank(d, db.list_lenders())
+            if not ranked:
+                return "No lenders in the book fit this deal (or the book is empty)."
+            return json.dumps([{"name": r["name"], "score": r["score"], "reasons": r["reasons"]}
+                               for r in ranked[:8]], default=str)
+        if name == "read_deal_documents":
+            docs = db.document_texts(int(inp["deal_id"]))
+            if not docs:
+                return "This deal has no documents with extracted text."
+            return json.dumps([{"filename": d["filename"], "text": d["text"]} for d in docs], default=str)
+        if name == "draft_email":
+            d = db.get_deal(int(inp["deal_id"]))
+            if not d:
+                return "ERROR: no deal with that id."
+            body = draft_email(d, (inp.get("intent") or "Follow up on the deal.").strip(),
+                               (inp.get("to_name") or "").strip())
+            db.add_activity("agent", f"Cortex drafted an email for {d['name']}", d["id"])
+            return f"Draft ready (not sent):\n{body}"
+        if name == "add_task":
+            did = int(inp["deal_id"])
+            if not db.get_deal(did):
+                return "ERROR: no deal with that id."
+            body = (inp.get("body") or "").strip()[:500]
+            if not body:
+                return "ERROR: task body is empty."
+            db.add_task(did, body, (inp.get("due") or "").strip() or None)
+            db.add_activity("agent", f"Cortex added task to deal {did}: {body[:60]}", did)
+            return f"Added task to deal {did}."
+        return f"ERROR: unknown tool {name}."
+    except budget.BudgetExceeded:
+        raise
+    except Exception as e:  # noqa: BLE001 — a tool failure is data for the agent, not a 500
+        log.warning("agent tool %s failed: %s", name, e)
+        return f"ERROR: {type(e).__name__}: {e}"
+
+
+def agent_act(question: str, deals: list[dict] | None = None) -> str:
+    """The tool-using Cortex agent. Answers AND acts. Manual tool-use loop; falls back
+    to keyword search with no key (same as agent_reply)."""
+    from . import db
+    if deals is None:
+        deals = db.deals_context()
+    if not available():
+        return _agent_rules(question, deals)
+    tools = _agent_tools()
+    messages: list = [{"role": "user", "content":
+                       f"My current deals (snapshot):\n{json.dumps(deals, default=str)}\n\n{question}"}]
+    resp = None
+    try:
+        client = _client()
+        for _ in range(AGENT_MAX_STEPS):
+            with budget.charge("agent"):
+                resp = client.messages.create(
+                    model=settings.llm_model, max_tokens=3072,
+                    thinking={"type": "adaptive"},
+                    system=_AGENT_TOOLS_SYS, tools=tools, messages=messages)
+            # preserve the WHOLE assistant turn (thinking + tool_use blocks) in history
+            messages.append({"role": "assistant", "content": resp.content})
+            if resp.stop_reason != "tool_use":
+                break
+            results = []
+            for block in resp.content:
+                if block.type == "tool_use":
+                    out = run_agent_tool(block.name, block.input or {})
+                    results.append({"type": "tool_result", "tool_use_id": block.id, "content": out})
+            messages.append({"role": "user", "content": results})
+        return _text(resp) or "(done — no message)"
+    except budget.BudgetExceeded as e:
+        return f"⚠️ {e}"
+    except Exception as e:  # noqa: BLE001
+        log.warning("agent_act failed (%s) — falling back to keyword search: %s", type(e).__name__, e)
+        return _agent_rules(question, deals)
+
+
 def _memo_template(deal: dict) -> str:
     def f(k, money=False):
         v = deal.get(k)
@@ -327,7 +521,33 @@ def demo() -> None:
     # extraction schema must stay lean (all-required sentinels; see ExtractedTerms docstring)
     assert len(ExtractedTerms.model_fields) <= 16, len(ExtractedTerms.model_fields)
     assert "$12,500,000" in _memo_template({"name": "X", "loan_amount": 12_500_000})
-    print("ai.demo (rules fallback) OK")
+
+    # agent falls back to keyword search with no key (the loop is only entered with a key)
+    assert not available(), "demo runs keyless"
+    assert "Main St Tower" in agent_act("which office deals in dallas", [
+        {"name": "Main St Tower", "stage": "LOI", "pipeline": "acquisition",
+         "property_type": "Office", "city": "Dallas"}])
+
+    # --- agent tool executors are deterministic + testable without a key --------
+    import os as _os, tempfile as _tempfile
+    from . import db as _db
+    settings.db_path = _os.path.join(_tempfile.mkdtemp(), "agent.db")
+    _db.init_db()
+    out = run_agent_tool("create_deal", {"name": "Tower A", "pipeline": "acquisition",
+                                         "property_type": "Office", "purchase_price": 10_000_000,
+                                         "cap_rate": 6.0, "ltv": 65.0, "interest_rate": 6.5})
+    assert "Created deal id=" in out, out
+    did = _db.list_deals()[0]["id"]
+    assert "Office" in run_agent_tool("get_deal", {"deal_id": did})
+    assert "Updated deal" in run_agent_tool("update_deal", {"deal_id": did, "loan_amount": 6_500_000})
+    assert _db.get_deal(did)["loan_amount"] == 6_500_000
+    uw = json.loads(run_agent_tool("run_underwriting", {"deal_id": did}))
+    assert uw.get("dscr") is not None and "returns" in uw, uw
+    assert "Added task" in run_agent_tool("add_task", {"deal_id": did, "body": "Call broker"})
+    assert _db.list_tasks(did), "agent add_task did not persist"
+    assert "no deal with that id" in run_agent_tool("update_deal", {"deal_id": 99999, "notes": "x"})
+    assert "unknown tool" in run_agent_tool("bogus", {})
+    print("ai.demo (rules fallback + agent tools) OK")
 
 
 if __name__ == "__main__":

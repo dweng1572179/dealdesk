@@ -3,14 +3,15 @@
 
 <div class="mb-6">
   <h1 class="text-2xl font-semibold tracking-tight">How can I help with your deals?</h1>
-  <p class="text-sm text-slate-500">Ask <b>Cortex</b> about your pipeline, or draft an email — it reads your live deals and
-    routes each request to the right specialist (deal Q&A, underwriting, matching, memos).</p>
+  <p class="text-sm text-slate-500">Ask <b>Cortex</b>, or tell it to <i>do</i> something — with a key it can
+    create and update deals, run an underwriting model, match lenders, read a deal's documents, and draft
+    email, all from chat.</p>
 </div>
 
 {% if not ai_on %}
 <div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-  No Anthropic key set — the agent answers with keyword matching and drafts from templates.
-  Add your key in <a href="/settings" class="underline font-medium">Settings</a> for the full agent.
+  No Anthropic key set — Cortex answers with keyword matching and can't take actions yet.
+  Add your key in <a href="/settings" class="underline font-medium">Settings</a> for the full tool-using agent.
 </div>
 {% endif %}
 
@@ -26,7 +27,7 @@
       <button class="rounded-lg bg-indigo-600 px-5 py-2 text-white font-medium hover:bg-indigo-700">Ask</button>
     </form>
     <div class="mt-2 flex flex-wrap gap-2 text-xs">
-      {% for s in ["Which deals are closest to closing?", "Summarize my financing pipeline", "Which deals have open tasks?"] %}
+      {% for s in ["Which deals are closest to closing?", "Run the underwriting model on Harbor Pointe", "Match lenders for my Austin deal", "Add a task to call the broker on Riverbend"] %}
       <button class="rounded-full border bg-white px-3 py-1 text-slate-600 hover:border-indigo-400"
               hx-post="/agent" hx-target="#agent-out" hx-vals='{"question": {{ s|tojson }}}'>{{ s }}</button>
       {% endfor %}
