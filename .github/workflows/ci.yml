@@ -23,7 +23,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Unit self-checks (ai · matching · underwriting · docparse · inbox · budget · csvimport · db)
+      - name: "Unit self-checks (ai, matching, underwriting, docparse, inbox, budget, csvimport, db)"
         run: python -m tests.test_units
-      - name: End-to-end smoke (HTTP: auth · deals · placements · vault · match · underwrite · market · CRM · export · backup)
+      - name: "End-to-end smoke over HTTP (auth, deals, placements, vault, match, underwrite, market, CRM, export, backup)"
         run: python -m tests.test_smoke
