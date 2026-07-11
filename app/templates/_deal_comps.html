@@ -1,0 +1,49 @@
+{# Similar closed loans for a deal + a comparable-pricing readout. Rendered into #panel.
+   Expects: deal, comps (ranked, from matching.rank_comps), pricing (or None), total. #}
+<div class="rounded-xl border bg-white shadow-sm">
+  <div class="px-4 py-2 border-b bg-slate-50 text-sm text-slate-500">
+    Comparable loans for <b>{{ deal.name }}</b>
+    <span class="text-xs">· {{ [deal.property_type, deal.state]|select|join(' · ') }}</span>
+  </div>
+
+  {% if pricing %}
+  <div class="px-4 py-3 border-b bg-indigo-50/40">
+    <div class="text-xs text-indigo-500 font-medium mb-1">Indicated pricing · from {{ pricing.n }} similar closed loan{{ '' if pricing.n == 1 else 's' }}</div>
+    <div class="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+      <div><span class="text-2xl font-semibold tabular-nums text-indigo-700">{{ pricing.rate_median }}%</span> <span class="text-slate-500">median rate</span></div>
+      <div class="text-slate-500">range <b class="text-slate-700 tabular-nums">{{ pricing.rate_low }}%–{{ pricing.rate_high }}%</b></div>
+      {% if pricing.ltv_avg %}<div class="text-slate-500">avg LTV <b class="text-slate-700 tabular-nums">{{ pricing.ltv_avg }}%</b></div>{% endif %}
+    </div>
+    <p class="mt-1 text-xs text-slate-400">Off your own comp set — no live feed. Maintain it under Market → Recent terms.</p>
+  </div>
+  {% endif %}
+
+  <div class="p-4">
+    {% if not comps %}
+    <p class="text-sm text-slate-400">
+      {% if total %}No comps match this deal's asset type or state yet. Add closed-loan comps under
+      <a href="/market" class="text-indigo-600 hover:underline">Market → Recent terms</a>.{% else %}
+      No loan comps in your book. Import some under <a href="/market" class="text-indigo-600 hover:underline">Market</a>.{% endif %}
+    </p>
+    {% else %}
+    <table class="w-full text-sm">
+      <thead class="text-xs text-slate-400 text-left"><tr>
+        <th class="py-1 pr-3">Match</th><th class="pr-3">Asset</th><th class="pr-3">State</th>
+        <th class="pr-3">Purpose</th><th class="pr-3">LTV</th><th class="pr-3">Rate</th><th>Issued</th></tr></thead>
+      <tbody class="divide-y">
+        {% for c in comps %}
+        <tr>
+          <td class="py-1.5 pr-3"><span class="text-xs px-1.5 py-0.5 rounded-full {{ 'bg-emerald-100 text-emerald-800' if c.similarity >= 70 else 'bg-slate-100 text-slate-600' }}">{{ c.similarity }}</span></td>
+          <td class="pr-3 font-medium">{{ c.asset_type or '—' }}</td>
+          <td class="pr-3">{{ c.state or '—' }}</td>
+          <td class="pr-3 text-slate-600 text-xs">{{ c.loan_purpose or '—' }}</td>
+          <td class="pr-3 tabular-nums">{% if c.ltv %}{{ c.ltv }}%{% endif %}</td>
+          <td class="pr-3 tabular-nums font-medium">{% if c.rate %}{{ c.rate }}%{% endif %}</td>
+          <td class="text-slate-500 text-xs">{{ c.issued or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</div>

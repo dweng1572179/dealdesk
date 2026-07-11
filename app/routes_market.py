@@ -9,7 +9,7 @@ benchmarks; the honest open trade is you maintain the reference data (seeded, th
 edit/import your own)."""
 from io import BytesIO  # imported directly: the xlsx route has an `io` query param that shadows the module
 
-from fastapi import Depends, Request, UploadFile
+from fastapi import Depends, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 
 from . import ai, csvimport, db, matching, underwriting
@@ -34,6 +34,20 @@ def deal_match(request: Request, deal_id: int, _=Depends(require_auth)):
     return templates.TemplateResponse("_match.html", {
         "request": request, "deal": deal, "matches": ranked, "excluded": excluded,
         "placed": placed})
+
+
+@app.get("/deal/{deal_id}/comps", response_class=HTMLResponse)
+def deal_comps(request: Request, deal_id: int, _=Depends(require_auth)):
+    """Similar closed loans for this deal → comparable pricing off your own comp set."""
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return templates.TemplateResponse("_error.html", {"request": request, "msg": "Unknown deal."})
+    comps = db.list_loan_comps(limit=100000)
+    ranked = matching.rank_comps(deal, comps)
+    pricing = matching.comp_pricing(deal, comps)
+    return templates.TemplateResponse("_deal_comps.html", {
+        "request": request, "deal": deal, "comps": ranked, "pricing": pricing,
+        "total": len(comps)})
 
 
 @app.post("/deal/{deal_id}/match/{lender_id}/why", response_class=HTMLResponse)
@@ -118,6 +132,41 @@ def market(request: Request, imported: str = "", _=Depends(require_auth)):
     ctx |= {"base_rates": db.list_base_rates(), "comps": db.list_loan_comps(),
             "lender_count": len(db.list_lenders()), "imported": imported or None}
     return templates.TemplateResponse("market.html", ctx)
+
+
+def _filter_comps(comps: list[dict], asset: str, state: str, q: str) -> list[dict]:
+    asset, state, q = asset.strip().lower(), state.strip().upper(), q.strip().lower()
+    out = []
+    for c in comps:
+        if asset and (c.get("asset_type") or "").lower() != asset:
+            continue
+        if state and (c.get("state") or "").upper() != state:
+            continue
+        if q and q not in " ".join(str(v) for v in c.values()).lower():
+            continue
+        out.append(c)
+    return out
+
+
+@app.get("/market/comps", response_class=HTMLResponse)
+def market_comps(request: Request, asset: str = "", state: str = "", q: str = "",
+                 _=Depends(require_auth)):
+    """Filtered Recent-terms table (HTMX partial) — asset type, state, free text."""
+    comps = _filter_comps(db.list_loan_comps(limit=100000), asset, state, q)
+    return templates.TemplateResponse("_comps.html", {"request": request, "comps": comps})
+
+
+@app.post("/market/rate/{rate_id}", response_class=HTMLResponse)
+def rate_edit(request: Request, rate_id: int, value: str = Form(""),
+              delta_1d: str = Form(""), delta_1m: str = Form(""), _=Depends(require_auth)):
+    """Inline-edit one base rate's value/deltas by name (rates are keyed by name)."""
+    rates = {r["id"]: r for r in db.list_base_rates()}
+    r = rates.get(rate_id)
+    if r:
+        db.upsert_base_rate(r["name"], _num(value) if value.strip() else r["value"],
+                            _num(delta_1d) if delta_1d.strip() else r["delta_1d"],
+                            _num(delta_1m) if delta_1m.strip() else r["delta_1m"])
+    return templates.TemplateResponse("_rates.html", {"request": request, "base_rates": db.list_base_rates()})
 
 
 def _num(v):

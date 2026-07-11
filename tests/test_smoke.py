@@ -87,6 +87,18 @@ def run() -> None:
         # Market page renders seeded base rates + comps; comps import works
         mkt = c.get("/market")
         assert mkt.status_code == 200 and "Base rates" in mkt.text and "Prime" in mkt.text
+
+        # comparable loans for the deal (seeded comps include Multifamily/TX)
+        cm = c.get(f"/deal/{deal_id}/comps")
+        assert cm.status_code == 200 and "Comparable loans" in cm.text
+        # comp filter partial
+        assert c.get("/market/comps?asset=Multifamily").status_code == 200
+        assert c.get("/market/comps?state=TX&q=agency").status_code == 200
+        # inline base-rate edit
+        rid = db.list_base_rates()[0]["id"]
+        re_ = c.post(f"/market/rate/{rid}", data={"value": "7.10"})
+        assert re_.status_code == 200
+        assert any(r["id"] == rid and r["value"] == 7.10 for r in db.list_base_rates())
         # includes an over-wide row (unquoted comma in notes) — must NOT 500 (restkey fix)
         comp_csv = (b"asset_type,state,loan_purpose,rate,ltv,issued,notes\n"
                     b"Hotel,NV,Acquisition,9.1,60,2026-07,great deal, closed fast\n")

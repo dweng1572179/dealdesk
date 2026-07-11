@@ -1,0 +1,29 @@
+{# Base-rate benchmarks, inline-editable. Included in market.html + returned by an edit.
+   Each row's value/deltas are a tiny form that hx-posts and re-renders this partial. #}
+{% if base_rates %}
+<table class="w-full text-sm">
+  <thead class="text-xs text-slate-400 text-left"><tr><th class="py-1 pr-4">Benchmark</th><th class="pr-4">Rate</th><th class="pr-4">1-day</th><th class="pr-4">1-month</th><th>Updated</th></tr></thead>
+  <tbody class="divide-y">
+    {% for r in base_rates %}
+    <tr>
+      <td class="py-1.5 pr-4 font-medium">{{ r.name }}</td>
+      <td colspan="3">
+        <form class="flex items-center gap-2" hx-post="/market/rate/{{ r.id }}" hx-target="#rates" hx-trigger="change">
+          <label class="flex items-center gap-1"><span class="text-xs text-slate-400">rate</span>
+            <input name="value" value="{{ r.value if r.value is not none else '' }}" inputmode="decimal"
+                   class="w-16 rounded border px-1.5 py-0.5 text-sm tabular-nums">%</label>
+          <label class="flex items-center gap-1"><span class="text-xs text-slate-400">1d</span>
+            <input name="delta_1d" value="{{ r.delta_1d if r.delta_1d is not none else '' }}" inputmode="decimal"
+                   class="w-14 rounded border px-1.5 py-0.5 text-sm tabular-nums"></label>
+          <label class="flex items-center gap-1"><span class="text-xs text-slate-400">1m</span>
+            <input name="delta_1m" value="{{ r.delta_1m if r.delta_1m is not none else '' }}" inputmode="decimal"
+                   class="w-14 rounded border px-1.5 py-0.5 text-sm tabular-nums"></label>
+        </form>
+      </td>
+      <td class="text-slate-400 text-xs">{{ r.updated_at }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="mt-2 text-xs text-slate-400">Edit a value and tab out to save — you maintain these (Lev streams them live; the open version is BYO).</p>
+{% else %}<p class="text-sm text-slate-400">No base rates. Import a CSV (name,value,delta_1d,delta_1m).</p>{% endif %}
