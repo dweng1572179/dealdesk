@@ -4,6 +4,11 @@ import os
 import tempfile
 
 os.environ["DB_PATH"] = os.path.join(tempfile.mkdtemp(), "units.db")
+# force the keyless / no-inbox paths regardless of any local .env — the module demos
+# exercise the rules/template fallbacks, not the live API. Must be set before importing
+# app.config (the settings singleton reads env at import time).
+os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["EMAIL_USER"] = os.environ["EMAIL_PASSWORD"] = ""
 
 from app import ai, budget, csvimport, db, docparse, inbox, matching, seed, underwriting  # noqa: E402
 

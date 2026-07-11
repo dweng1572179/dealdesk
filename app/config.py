@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     email_password: str = ""  # App Password, NOT your account password
     email_from: str = ""      # defaults to email_user if blank
 
-    monthly_budget_cents: int = 1000  # hard cap on AI spend per calendar month
+    monthly_budget_cents: int = 2500  # hard cap on AI spend per calendar month (real token cost)
     db_path: str = "dealdesk.db"
 
     @field_validator("*", mode="before")

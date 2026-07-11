@@ -52,12 +52,13 @@ def agent_reply(question: str, deals: list[dict]) -> str:
     if not available():
         return _agent_rules(question, deals)
     try:
-        with budget.charge("agent"):
+        with budget.charge("agent") as _m:
             resp = _client().messages.create(
                 model=settings.llm_model, max_tokens=1200,
                 system=_AGENT_SYS,
                 messages=[{"role": "user", "content":
                            f"My deals:\n{json.dumps(deals, default=str)}\n\nQuestion: {question}"}])
+            _m.record(resp)
         return _text(resp) or "(no answer)"
     except budget.BudgetExceeded as e:
         return f"⚠️ {e}"
@@ -98,7 +99,7 @@ def extract_terms(text: str) -> dict:
     if not available():
         return _extract_rules(text)
     try:
-        with budget.charge("extract"):
+        with budget.charge("extract") as _m:
             resp = _client().messages.parse(
                 model=settings.llm_model, max_tokens=1024,
                 system=("Extract commercial-real-estate deal terms from the document. EVERY field "
@@ -108,6 +109,7 @@ def extract_terms(text: str) -> dict:
                         "pref. summary is one sentence."),
                 messages=[{"role": "user", "content": text}],
                 output_format=ExtractedTerms)
+            _m.record(resp)
         parsed: ExtractedTerms = resp.parsed_output
         out = parsed.to_deal_fields()
         out["summary"] = parsed.summary
@@ -197,7 +199,7 @@ def draft_email(deal: dict, intent: str, to_name: str = "") -> str:
     if not available():
         return _draft_template(deal, intent, to_name)
     try:
-        with budget.charge("draft"):
+        with budget.charge("draft") as _m:
             resp = _client().messages.create(
                 model=settings.llm_model, max_tokens=700,
                 system=("Draft a concise, professional email for a CRE dealmaker. No pressure, no "
@@ -206,6 +208,7 @@ def draft_email(deal: dict, intent: str, to_name: str = "") -> str:
                 messages=[{"role": "user", "content":
                            f"Deal: {json.dumps(deal, default=str)}\nRecipient: {to_name or 'the counterparty'}\n"
                            f"Purpose: {intent}"}])
+            _m.record(resp)
         return _text(resp) or _draft_template(deal, intent, to_name)
     except budget.BudgetExceeded as e:
         return f"⚠️ {e}"
@@ -233,13 +236,14 @@ def match_rationale(deal: dict, lender: dict) -> str | None:
     if not available():
         return None
     try:
-        with budget.charge("match"):
+        with budget.charge("match") as _m:
             resp = _client().messages.create(
                 model=settings.llm_model, max_tokens=200,
                 system=("In 1-2 sentences, give the pros and cons of taking this CRE deal to this "
                         "lender, based only on the fit between the deal and the lender's stated box."),
                 messages=[{"role": "user", "content":
                            f"Deal: {json.dumps(deal, default=str)}\nLender: {json.dumps(lender, default=str)}"}])
+            _m.record(resp)
         return _text(resp)
     except budget.BudgetExceeded as e:
         # the key IS set — the cap is the reason. Say so, don't imply a missing key.
@@ -256,7 +260,7 @@ def deal_memo(deal: dict, contacts: list[dict], documents: list[dict]) -> str:
     if not available():
         return _memo_template(deal)
     try:
-        with budget.charge("docgen"):
+        with budget.charge("docgen") as _m:
             resp = _client().messages.create(
                 model=settings.llm_model, max_tokens=1500,
                 system=("Write a one-page CRE deal memo / lender teaser in Markdown from the deal "
@@ -266,6 +270,7 @@ def deal_memo(deal: dict, contacts: list[dict], documents: list[dict]) -> str:
                            f"Deal: {json.dumps(deal, default=str)}\n"
                            f"Contacts: {json.dumps(contacts, default=str)}\n"
                            f"Docs on file: {[d.get('filename') for d in documents]}"}])
+            _m.record(resp)
         return _text(resp) or _memo_template(deal)
     except budget.BudgetExceeded as e:
         return f"> ⚠️ {e}"
@@ -445,11 +450,12 @@ def agent_act(question: str, deals: list[dict] | None = None) -> str:
     try:
         client = _client()
         for _ in range(AGENT_MAX_STEPS):
-            with budget.charge("agent"):
+            with budget.charge("agent") as _m:
                 resp = client.messages.create(
                     model=settings.llm_model, max_tokens=3072,
                     thinking={"type": "adaptive"},
                     system=_AGENT_TOOLS_SYS, tools=tools, messages=messages)
+                _m.record(resp)
             # preserve the WHOLE assistant turn (thinking + tool_use blocks) in history
             messages.append({"role": "assistant", "content": resp.content})
             if resp.stop_reason != "tool_use":
@@ -479,7 +485,7 @@ def om_narrative(deal: dict, documents: list[dict]) -> dict:
     if not available():
         return _om_template(deal)
     try:
-        with budget.charge("docgen"):
+        with budget.charge("docgen") as _m:
             resp = _client().messages.parse(
                 model=settings.llm_model, max_tokens=900,
                 system=("Write the narrative for a one-page CRE offering memorandum / lender "
@@ -488,6 +494,7 @@ def om_narrative(deal: dict, documents: list[dict]) -> dict:
                         "bullets. Use ONLY the facts given; do not invent numbers or names."),
                 messages=[{"role": "user", "content": json.dumps(deal, default=str)}],
                 output_format=OMNarrative)
+            _m.record(resp)
         parsed: OMNarrative = resp.parsed_output
         return {"summary": parsed.summary or _om_template(deal)["summary"],
                 "highlights": [h for h in parsed.highlights if h.strip()] or _om_template(deal)["highlights"]}
