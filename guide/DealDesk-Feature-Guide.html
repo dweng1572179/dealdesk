@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DealDesk — Feature Guide</title>
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="full cover">
+  <div class="top">
+    <div class="logo"><span class="wm">Deal<span style="color:var(--blue)">Desk</span></span></div>
+    <div class="kicker">Feature Guide</div>
+  </div>
+  <h1>Everything DealDesk<br><span class="b">Can Do.</span></h1>
+  <p class="sub">A guided tour of every feature, one screen at a time — what it's for, where to click, and what you'll see. Read it start to finish, or jump to the part you need. Nothing here requires a key unless it says so; the AI parts light up once you paste your Anthropic key in Settings.</p>
+  <div class="reassure">
+    <div><div class="k">10 tools</div><div class="v">one workspace</div></div>
+    <div><div class="k">Zero keys</div><div class="v">for most of it</div></div>
+    <div><div class="k">Your data</div><div class="v">one SQLite file</div></div>
+  </div>
+  <div class="foot">Dashboard · pipelines · Scout (the AI agent) · underwriting models · placements · lender matching · market comps · offering memoranda · email threads · export &amp; backup.</div>
+</section>
+
+<!-- ============ DASHBOARD & PIPELINES ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">01</span><div class="bt"><h2>The dashboard &amp; your pipelines</h2><p>Your home screen: what's in the pipeline, what it's worth, and what needs doing.</p></div><span class="wmmini">DealDesk</span></div>
+  <div class="steps">
+    <div class="step"><div class="dot">›</div><h3>Read the numbers at a glance</h3><p>The <strong>Home</strong> page shows four headline tiles — <strong>open pipeline</strong> (total loan $), <strong>weighted pipeline</strong> (each deal's loan $ times its stage's close-probability), <strong>open deals</strong>, and <strong>lenders in your book</strong> — plus a bar chart of loan $ per stage for each pipeline, and a live activity feed.</p>
+      <div class="see"><b>Weighted vs. open:</b> "open" is the raw total; "weighted" discounts each deal by how likely its stage is to close, so it's a more honest forecast.</div></div>
+    <div class="step"><div class="dot">›</div><h3>Work the boards</h3><p>Click <strong>Deals</strong>. Deals live on two Kanban boards — <strong>Acquisition</strong> and <strong>Financing</strong> — one column per stage. To move a deal, use the little <strong>stage dropdown</strong> on its card; the board re-sorts instantly. Click a card to open the deal.</p></div>
+    <div class="step"><div class="dot">›</div><h3>Add or import deals</h3><p><strong>+ New deal</strong> opens a quick form. <strong>Import CSV</strong> bulk-loads deals (name required; the rest optional). <strong>Export</strong> downloads the current pipeline as CSV — the same format the importer reads, so it round-trips.</p></div>
+  </div>
+</section>
+
+<!-- ============ SCOUT ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">02</span><div class="bt"><h2>Scout — your AI deal agent</h2><p>Ask about your deals, or tell it to <em>do</em> something. Needs your Anthropic key.</p></div><span class="wmmini">DealDesk</span></div>
+  <div class="note calm" style="margin:0 0 14px"><b style="color:var(--navy)">Two modes, one box.</b> Scout answers questions <em>and</em> takes actions. With no key it degrades to keyword search over your deals; with a key it becomes a tool-using agent.</div>
+  <div class="steps">
+    <div class="step"><div class="dot">›</div><h3>Ask it anything about your book</h3><p>From <strong>Home</strong>, type into the ask box. "Which of my deals are closest to closing?" · "Summarize my financing pipeline." · "Which deals have open tasks?" Scout reads a live snapshot of your deals and answers, citing deal names.</p></div>
+    <div class="step"><div class="dot">›</div><h3>Tell it to take an action</h3><p>Scout can <strong>create and update deals, run an underwriting model, match lenders, read a deal's documents, draft email, and add tasks</strong> — all from chat.</p>
+      <div class="pastebox"><span class="mono" style="color:var(--blue)">try:</span><span>"Create an acquisition deal called Sunset Plaza — office in Denver, $30M, 60% LTV, 6.5% cap — then run the model."</span></div>
+      <div class="see"><b>What happens:</b> Scout creates the deal (you'll find it on the board), sizes the loan and NOI, and reports DSCR / debt yield. If something's missing — say, no interest rate — it tells you and asks, rather than inventing a number.</div></div>
+    <div class="step"><div class="dot">›</div><h3>Ask about a deal's documents</h3><p>Upload a term sheet or OM to a deal (see <strong>07</strong>), then ask Scout about it: "What rate did the lender quote on Harbor Pointe?" It reads the extracted text and answers from the document.</p></div>
+  </div>
+</section>
+
+<!-- ============ UNDERWRITING ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">03</span><div class="bt"><h2>The underwriting-model builder</h2><p>A lender-grade model from the deal's fields — pure finance math, no key needed.</p></div><span class="wmmini">DealDesk</span></div>
+  <div class="steps">
+    <div class="step"><div class="dot">›</div><h3>Build the model</h3><p>Open a deal → <strong>Build underwriting model</strong>. DealDesk fills the gaps (NOI from price×cap, loan from price×LTV), sizes the debt, and shows <strong>DSCR, debt yield, cash-on-cash</strong>, and a multi-year pro forma. Tune amortization, NOI growth, hold, exit cap, and interest-only <strong>inline</strong> — every metric updates live.</p></div>
+    <div class="step"><div class="dot">›</div><h3>See the exit &amp; returns</h3><p>The model projects a sale at the end of the hold (forward NOI ÷ exit cap, less costs and loan payoff) and reports a <strong>levered IRR</strong> and <strong>equity multiple</strong>. A <strong>rate × cap DSCR sensitivity grid</strong> shows how coverage holds up as pricing and values move.</p></div>
+    <div class="step"><div class="dot">›</div><h3>Compare loan scenarios</h3><p><strong>Loan scenarios</strong> puts several structures side by side — as-entered, interest-only, a +100 bps rate stress, and an <strong>index + spread quote</strong> priced off your Base rates (pick a benchmark, set the spread in bps).</p></div>
+    <div class="step"><div class="dot">›</div><h3>Download the Excel</h3><p><strong>download .xlsx</strong> saves the whole model — sources &amp; uses, debt sizing, returns, pro forma, and the sensitivity grid — as a real spreadsheet you can hand to a lender.</p>
+      <div class="see"><b>All deterministic.</b> No Anthropic key is used or needed for any of this — it's finance math you can audit.</div></div>
+  </div>
+</section>
+
+<!-- ============ PLACEMENTS & MATCHING ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">04</span><div class="bt"><h2>Lender matching, comps &amp; placements</h2><p>Find the right capital, see what similar loans priced at, and track who you've shopped.</p></div><span class="wmmini">DealDesk</span></div>
+  <div class="steps">
+    <div class="step"><div class="dot">›</div><h3>Match lenders</h3><p>On a deal → <strong>Match lenders</strong> ranks your own lender book against the deal, with a 0–100 fit score and plain-English reasons. Lenders whose box the deal can't fit are shown separately with why. With a key, <strong>AI pros/cons</strong> adds a one-line take per lender.</p></div>
+    <div class="step"><div class="dot">›</div><h3>Shop it — and track placements</h3><p>Hit <strong>+ shop</strong> on a matched lender and it becomes a <strong>Placement</strong> on the deal — where you took it, its status (shopped → quoted → selected), and terms. The Placements panel is the record of who you called.</p></div>
+    <div class="step"><div class="dot">›</div><h3>See comparable loans</h3><p><strong>Comparable loans</strong> matches your closed-loan comps to the deal (asset type, state, leverage) and reads out an <strong>indicated market rate</strong> — the median of similar closed loans — so you know what's fair before you quote it.</p>
+      <div class="see"><b>It's your data.</b> There's no live market feed — the comps are the ones you seed and maintain, so the pricing signal is only as current as you keep it.</div></div>
+  </div>
+</section>
+
+<!-- ============ MARKET & OM ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">05</span><div class="bt"><h2>Market data &amp; offering memoranda</h2><p>Your capital-markets reference set, and a lender-ready OM in one click.</p></div><span class="wmmini">DealDesk</span></div>
+  <div class="steps">
+    <div class="step"><div class="dot">›</div><h3>Keep your Market current</h3><p><strong>Market</strong> holds your lender <strong>Directory</strong>, <strong>Base rates</strong> (loan-pricing benchmarks — edit them inline as they move), and <strong>Recent terms</strong> (closed-loan comps you can filter by asset/state/text or import from CSV).</p></div>
+    <div class="step"><div class="dot">›</div><h3>Generate an offering memorandum</h3><p>On a deal → <strong>Offering memo</strong> builds a full sectioned OM: executive summary, investment highlights, financing request, a financial summary (pulled from the underwriting model), comparable financing (from your comps), and sponsor. With a key the prose is AI-written; without, it's filled from the deal's own fields.</p>
+      <div class="see"><b>Download it:</b> <strong>download .html</strong> saves a standalone, print-ready file — and your browser's <strong>Print → Save as PDF</strong> turns it into a PDF.</div></div>
+  </div>
+</section>
+
+<!-- ============ DOCS & EMAIL ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">06</span><div class="bt"><h2>Documents &amp; the email loop</h2><p>Extract terms from a file; keep a real email thread on every deal.</p></div><span class="wmmini">DealDesk</span></div>
+  <div class="steps">
+    <div class="step"><div class="dot">›</div><h3>Upload &amp; extract terms</h3><p>On a deal → <strong>Upload document</strong> (term sheet, OM, email — PDF, .docx, or text). DealDesk pulls out <strong>structured terms</strong> (loan, LTV, rate, DSCR, cap…). Tick <strong>apply</strong> to write them straight onto the deal. The original file is kept in the <strong>Documents</strong> vault to view or download later.</p>
+      <div class="see"><b>With a key,</b> extraction uses the AI (far better on messy prose — it'll pick the all-in rate over the spread). Without, it uses regex on the common patterns.</div></div>
+    <div class="step"><div class="dot">›</div><h3>Sync &amp; thread email</h3><p>Once your inbox is connected (Setup Guide, Phase 3), <strong>sync inbox</strong> pulls recent mail and files it onto the right deal (by the sender's contact, or the deal name in the subject). Each deal gets an <strong>Emails</strong> panel — a real thread of in and out messages.</p></div>
+    <div class="step"><div class="dot">›</div><h3>Reply, template, send</h3><p><strong>Reply</strong> on an inbound message pre-fills the recipient and quotes the original. <strong>+ compose</strong> starts fresh, with <strong>follow-up templates</strong> (Follow-up, Request term sheet, Intro/teaser, Status update) that fill in from the deal. Sending stores the message on the thread.</p></div>
+  </div>
+</section>
+
+<!-- ============ CONTROL: EXPORT, BACKUP, CAP, POLISH ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">07</span><div class="bt"><h2>Staying in control</h2><p>Your data out, your workspace safe, your spend capped, your way.</p></div><span class="wmmini">DealDesk</span></div>
+  <div class="steps">
+    <div class="step"><div class="dot">›</div><h3>Export &amp; back up</h3><p><strong>Backup</strong> (top nav) exports deals, lenders, contacts, and comps to <strong>CSV</strong>, and downloads your whole workspace as one <strong>SQLite .db</strong> file. You can <strong>restore</strong> from a backup there too — it validates the file and keeps a <span class="file">.bak</span> of the current one first.</p></div>
+    <div class="step"><div class="dot">›</div><h3>Adjust your AI spend cap — anytime</h3><p>The header always shows <span class="mono">AI spend $X / $Y</span> — real cost to date over your monthly cap. To change the cap, go to <strong>Settings → Monthly AI-spend cap (cents)</strong>, enter a new number (<span class="mono">2500</span> = $25, <span class="mono">10000</span> = $100), and <strong>Save</strong>. It applies immediately.</p>
+      <div class="see"><b>What the cap does:</b> once your metered spend reaches it, DealDesk refuses <em>paid</em> AI calls (they fall back to the free rules/templates or ask you to raise the cap) until the next calendar month — so a busy day can't run up a surprise bill.</div></div>
+    <div class="step"><div class="dot">›</div><h3>Make it yours</h3><p><strong>Dark mode</strong> — the toggle in the header, or press <span class="mono">d</span>. <strong>Keyboard shortcuts</strong> — press <span class="mono">?</span> for the list (<span class="mono">g d</span> to Deals, <span class="mono">/</span> to focus the ask box, <span class="mono">n</span> for a new deal). <strong>Reset</strong> — Settings → Workspace → "Reload demo data" or "Clear everything" to start fresh (your keys are kept).</p></div>
+  </div>
+  <div class="milestone" style="margin-top:14px"><h3>That's the whole desk.</h3><p class="big">Run deals, model them, match capital, memo them, email counterparties, and keep every byte on your own machine — capped at exactly what you choose to spend.</p></div>
+</section>
+
+</body>
+</html>

@@ -48,6 +48,12 @@ something in it. **Everything works with zero API keys**; add an Anthropic key i
 extraction, and drafting. Non-technical? Double-click **Start DealDesk**
 (`.command` on Mac, `.bat` on Windows) instead.
 
+**Illustrated walkthroughs** live in [`guide/`](guide/): a plain-English
+[**Setup Guide**](guide/DealDesk-Setup-Guide.pdf) (install → run → keys → the spend cap,
+step by step, no coding) and a [**Feature Guide**](guide/DealDesk-Feature-Guide.pdf)
+touring every capability. Both as PDF; re-render with `guide/build-pdf.sh` after editing
+the HTML.
+
 It shares its architecture with OpenProp (a sibling self-hosted app): one service,
 one password, free by default, paid AI only when you use it (metered against a
 monthly cap).

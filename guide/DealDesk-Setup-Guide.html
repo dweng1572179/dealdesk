@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DealDesk — Set It Up Yourself</title>
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="full cover">
+  <div class="top">
+    <div class="logo"><span class="wm">Deal<span style="color:var(--blue)">Desk</span></span></div>
+    <div class="kicker">Setup Guide</div>
+  </div>
+  <h1>Set Up Your Own<br><span class="b">CRE Deal Desk.</span></h1>
+  <p class="sub">A plain-English guide — no coding, and you never open or edit a single file. If you can install an app and copy-and-paste into a website, you can do this. We go one small step at a time and tell you exactly what you'll see after each one.</p>
+  <div class="reassure">
+    <div><div class="k">~10 min</div><div class="v">start to finish</div></div>
+    <div><div class="k">Double-click</div><div class="v">no terminal, no code</div></div>
+    <div><div class="k">Your box</div><div class="v">your deals stay home</div></div>
+  </div>
+  <div class="foot">Your own private commercial-real-estate deal workspace, running on your computer — a CRM, an AI deal agent, an underwriting-model builder, lender matching, and market data, at the model's cost with no software markup, no per-seat fees, and no credits that expire.</div>
+</section>
+
+<!-- ============ OVERVIEW ============ -->
+<section class="full page">
+  <div class="eyebrow">The whole thing, in one look</div>
+  <h2 class="sec">Three phases. You can stop after two.</h2>
+  <p class="lead">Here's the entire journey before we start, so nothing is a surprise. You'll only ever <strong>double-click</strong> and <strong>use your web browser</strong> — never a command, never a file.</p>
+
+  <div class="phases">
+    <div class="phasecard"><div class="num">1</div><div><h3>Install the engine <span style="font-size:10pt;color:var(--slate);font-weight:400">— Windows only</span></h3><p>On <strong>Windows</strong>, install one free thing: <strong>Python</strong> — the "motor" DealDesk runs on. Two clicks and one checkbox. On a <strong>Mac</strong>, skip this entirely — the motor is already built in.</p></div><div class="tag opt">Windows</div></div>
+    <div class="phasecard"><div class="num">2</div><div><h3>Turn DealDesk on</h3><p>Set one password, double-click one file. DealDesk opens in your web browser. You can run deals, build underwriting models, and match lenders <strong>right away — no keys needed</strong>.</p></div><div class="tag free">Free</div></div>
+    <div class="phasecard"><div class="num">3</div><div><h3>Add the smarts (your keys)</h3><p>The AI agent, term extraction, drafting, and memos each come to life when you paste your <strong>Anthropic key</strong> in Settings. Connect an inbox to send email. And set a <strong>monthly spend cap</strong> so AI never surprises you.</p></div><div class="tag opt">Optional</div></div>
+  </div>
+
+  <div class="note calm"><b style="color:var(--navy)">You never touch code or files.</b> After Phase 2, DealDesk already works — pipelines, deals, a real underwriting Excel, lender matching, and market data, all free. Phase 3 is a menu you turn on inside the app by pasting keys. There's no wrong order and nothing to break.</div>
+  <div class="note" style="margin-top:12px"><b>On a Mac? Start at Phase 2.</b> Macs already have the engine built in, so Phase 1 is Windows-only — skip it. That makes the whole thing about <strong>7 minutes</strong>.</div>
+</section>
+
+<!-- ============ PHASE 1 ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">Phase 1</span><div class="bt"><h2>Install the engine</h2><p>Windows only — one download, one checkbox, ~3 min. <strong style="color:#fff">Mac owners: skip this page.</strong></p></div><span class="wmmini">DealDesk</span></div>
+
+  <div class="note calm" style="margin:0 0 16px"><b style="color:var(--navy)">On a Mac? You are already done with Phase 1.</b> macOS ships with Python — the engine DealDesk runs on. Nothing to download. Turn the page to Phase 2.</div>
+
+  <div class="steps">
+    <div class="step"><div class="dot">1</div><h3>Download Python</h3><p>In your web browser, go to the address below and click the big yellow <strong>Download Python</strong> button at the top. Don't worry about the version number — whichever one it offers is the right one.</p>
+      <div class="cmd"><span class="c">↗</span> python.org/downloads</div>
+      <div class="see"><b>What you'll see:</b> a file downloading, with a name like <span class="file">python-3.13.exe</span>, in your <strong>Downloads</strong> folder.</div></div>
+
+    <div class="step"><div class="dot">2</div><h3>Run it — and tick the box</h3><p>Open your <strong>Downloads</strong> folder and double-click the file you just downloaded. An installer window opens with two buttons and a couple of checkboxes at the bottom.</p>
+      <div class="warn"><b>This is the one thing you must not miss.</b> At the bottom of that window, tick <strong>"Add python.exe to PATH"</strong> <em>before</em> you click anything else. Without it, DealDesk can't find the engine and won't start.</div>
+      <p>Then click <strong>Install Now</strong> and let it run. If Windows asks "Do you want to allow this app to make changes?", click <strong>Yes</strong>.</p></div>
+
+    <div class="step"><div class="dot">3</div><h3>Close it</h3><p>When it says <strong>Setup was successful</strong>, click <strong>Close</strong>. That's the whole phase — no account, no restart, nothing to leave running.</p>
+      <div class="see"><b>You're done when:</b> the installer says <strong>Setup was successful</strong>. Python now sits quietly in the background forever; you'll never open it again.</div></div>
+  </div>
+</section>
+
+<!-- ============ PHASE 2 ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">Phase 2</span><div class="bt"><h2>Turn DealDesk on</h2><p>Set a password, double-click, log in. ~2 min — and it already does real work.</p></div><span class="wmmini">DealDesk</span></div>
+
+  <div class="steps">
+    <div class="step"><div class="dot">1</div><h3>Get the DealDesk folder onto your computer</h3><p>If you downloaded a ZIP, double-click it to unzip, and move the <span class="file">dealdesk</span> folder somewhere easy — your <strong>Desktop</strong> is perfect. Open the folder; you'll see files like <span class="file">Start DealDesk.command</span> (Mac) or <span class="file">Start DealDesk.bat</span> (Windows).</p></div>
+
+    <div class="step"><div class="dot">2</div><h3>Set your password</h3><p>Inside the folder is a file named <span class="file">.env.example</span>. Make a copy of it and rename the copy to just <span class="file">.env</span> (yes, starting with a dot). Open <span class="file">.env</span> in any text editor and change one line:</p>
+      <div class="pastebox"><span class="mono" style="color:var(--blue)">DEALDESK_PASSWORD=</span><span>type a password of your own after the <strong>=</strong> sign</span></div>
+      <div class="see"><b>That's the only line you must change.</b> This is the password you'll type to log into DealDesk. Save the file and close it.</div></div>
+
+    <div class="step"><div class="dot">3</div><h3>Double-click to start</h3><p>Double-click <strong>Start DealDesk</strong> — <span class="file">.command</span> on Mac, <span class="file">.bat</span> on Windows. The first time, it quietly builds itself (about a minute) and then opens your web browser to DealDesk.</p>
+      <div class="see"><b>On a Mac,</b> the first double-click may say the file is "from an unidentified developer." Right-click it → <strong>Open</strong> → <strong>Open</strong>, just once, and it runs from then on.</div>
+      <div class="cmd"><span class="c">↗</span> it opens to&nbsp; http://localhost:8799</div></div>
+
+    <div class="step"><div class="dot">4</div><h3>Log in and look around</h3><p>Type the password you set and hit <strong>Sign in</strong>. DealDesk comes pre-loaded with <strong>three sample deals, a starter lender book, and market data</strong> so every screen already has something in it.</p>
+      <div class="milestone"><h3>You now have a working deal desk.</h3><p class="big">Move deals through pipelines, build a real underwriting Excel, match lenders, and browse market data — all with <strong>zero keys</strong>. Phase 3 adds the AI.</p></div></div>
+  </div>
+
+  <div class="note" style="margin-top:14px"><b>Prefer not to double-click?</b> Advanced users can run it from a terminal instead: <span class="mono">python3 -m venv .venv &amp;&amp; source .venv/bin/activate &amp;&amp; pip install -r requirements.txt &amp;&amp; ./run.sh</span>. Same result, same port.</div>
+</section>
+
+<!-- ============ PHASE 3 ============ -->
+<section class="page break">
+  <div class="band"><span class="pill">Phase 3</span><div class="bt"><h2>Add the smarts — your keys</h2><p>The AI agent, term extraction, drafting, and memos wake up when you paste a key. Everything here is optional and pasted in the browser — no files.</p></div><span class="wmmini">DealDesk</span></div>
+
+  <p class="lead" style="margin-top:2px">In DealDesk, click <strong>settings</strong> (top-right). Every key below is pasted right there and applied instantly — <strong>no restart, no file editing</strong>.</p>
+
+  <div class="keycard">
+    <div class="keyhead" style="display:flex;align-items:center;gap:12px;background:var(--blue-soft);padding:11px 18px;border-bottom:1px solid var(--line)">
+      <span class="mono" style="font-weight:700;color:var(--navy)">Anthropic API key</span>
+      <span class="tag free" style="margin-left:auto">turns on Scout + AI</span>
+    </div>
+    <div style="padding:14px 20px">
+      <p style="margin:0 0 7px">This one key powers the whole AI side: <strong>Scout</strong> (the agent that answers questions and takes actions from chat), <strong>term extraction</strong> from uploaded documents, <strong>email/memo drafting</strong>, the <strong>offering memorandum</strong>, and <strong>lender pros/cons</strong>. Without it, those features fall back to keyword search, regex, and templates — still usable, just not as sharp.</p>
+      <div class="see"><b>Where to get it:</b> sign in at <span class="file">console.anthropic.com</span> → <strong>API Keys</strong> → <strong>Create Key</strong>. Copy it (it starts with <span class="mono">sk-ant-</span>), paste it into the <strong>Anthropic API key</strong> box in Settings, and hit <strong>Save</strong>. Then click <strong>Test Anthropic key</strong> — it should say it reached the model.</div>
+    </div>
+  </div>
+
+  <div class="keycard">
+    <div class="keyhead" style="display:flex;align-items:center;gap:12px;background:var(--blue-soft);padding:11px 18px;border-bottom:1px solid var(--line)">
+      <span class="mono" style="font-weight:700;color:var(--navy)">Email address + App Password</span>
+      <span class="tag opt" style="margin-left:auto">optional — for the inbox loop</span>
+    </div>
+    <div style="padding:14px 20px">
+      <p style="margin:0 0 7px">Connect an inbox to <strong>sync recent email into per-deal threads</strong> and <strong>send email from a deal</strong>. Any provider that speaks IMAP/SMTP works (Gmail, Outlook, Fastmail).</p>
+      <div class="warn"><b>Gmail and Outlook need an <em>App Password</em>, not your normal login password.</b> In Gmail: <span class="file">myaccount.google.com</span> → <strong>Security</strong> → <strong>2-Step Verification</strong> (turn on if needed) → <strong>App passwords</strong> → create one for "Mail." Paste that 16-character code as the <strong>Email App Password</strong> in Settings.</div>
+      <div class="see"><b>After saving,</b> click <strong>Test inbox (IMAP + SMTP)</strong> — it logs in both ways without sending anything, so you know it works before you rely on it.</div>
+    </div>
+  </div>
+
+  <div class="keycard">
+    <div class="keyhead" style="display:flex;align-items:center;gap:12px;background:var(--amber-soft);padding:11px 18px;border-bottom:1px solid var(--line)">
+      <span class="mono" style="font-weight:700;color:var(--amber)">Monthly AI spend cap</span>
+      <span class="tag opt" style="margin-left:auto">set it, then forget it</span>
+    </div>
+    <div style="padding:14px 20px">
+      <p style="margin:0 0 7px">DealDesk meters what the AI actually costs — the <strong>real token price</strong> of each call against your Anthropic account — and refuses paid AI once you hit your <strong>monthly cap</strong>. A running total sits in the header (<span class="mono">AI spend $X / $Y</span>) so there are never surprises.</p>
+      <div class="see"><b>It's yours to adjust, anytime.</b> The cap ships at <strong>$25/month</strong>. Change it in <strong>Settings → Monthly AI-spend cap (cents)</strong> — e.g. <span class="mono">5000</span> for $50 or <span class="mono">10000</span> for $100 — and hit Save. It applies immediately, no restart. Set it to whatever you're comfortable spending; when you reach it, DealDesk simply stops making paid calls until next month (or until you raise the cap).</div>
+    </div>
+  </div>
+
+  <div class="note calm" style="margin-top:6px"><b style="color:var(--navy)">Keys live in your workspace, not the cloud.</b> Everything you paste is stored in the single SQLite file on your own machine and used only to call the service you gave it. Back it up any time from <strong>Backup</strong> in the top nav.</div>
+</section>
+
+<!-- ============ CLOSE ============ -->
+<section class="full page close" style="background:var(--ink);color:var(--on-ink)">
+  <div class="top">
+    <div class="logo on-dark"><span class="wm" style="color:#fff">Deal<span style="color:#a5b4fc">Desk</span></span></div>
+    <div class="kicker" style="color:var(--on-ink-mute)">You're set up</div>
+  </div>
+  <h2>That's it. It's yours now.</h2>
+  <p class="sub" style="color:var(--on-ink-soft)">No subscription, no per-seat fee, no credits that expire. DealDesk runs on your computer, your data stays home, and you only pay the model's actual cost — capped at whatever you choose.</p>
+  <div class="cards" style="display:flex;gap:14px;margin-top:22px">
+    <div class="c"><h4>Run deals</h4><p style="color:var(--on-ink-soft);font-size:10.5pt">Acquisition &amp; financing boards, tasks, contacts, companies — all free.</p></div>
+    <div class="c"><h4>Ask Scout</h4><p style="color:var(--on-ink-soft);font-size:10.5pt">"Run the model on Harbor Pointe" — it does it, from chat.</p></div>
+    <div class="c"><h4>Stay in control</h4><p style="color:var(--on-ink-soft);font-size:10.5pt">Real spend metered, capped at your number, backup in one click.</p></div>
+  </div>
+  <div class="foot" style="color:var(--on-ink-mute);margin-top:auto">Turn the page (or open the <strong>Feature Guide</strong>) for a tour of everything DealDesk can do.</div>
+</section>
+
+</body>
+</html>
