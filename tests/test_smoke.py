@@ -69,9 +69,17 @@ def run() -> None:
         m = c.get(f"/deal/{deal_id}/match")
         assert m.status_code == 200 and ("/100" in m.text or "No lenders fit" in m.text)
 
-        # underwriting model: preview partial + a real .xlsx download
+        # give the deal full terms so the model produces exit + sensitivity
+        c.post(f"/deal/{deal_id}", data={"name": "Test Tower", "purchase_price": "12000000",
+               "cap_rate": "6.0", "ltv": "65", "interest_rate": "6.5"}, follow_redirects=True)
+        # underwriting model: preview partial (metrics + exit/IRR + sensitivity grid)
         uw = c.get(f"/deal/{deal_id}/underwrite")
         assert uw.status_code == 200 and "DSCR" in uw.text
+        assert "Levered IRR" in uw.text and "Equity multiple" in uw.text, "exit analysis missing"
+        assert "DSCR sensitivity" in uw.text, "sensitivity grid missing"
+        # exit cap knob flows through
+        assert c.get(f"/deal/{deal_id}/underwrite?exitcap=7.5").status_code == 200
+        # a real .xlsx download (now with exit + grid sheets)
         xlsx = c.get(f"/deal/{deal_id}/model.xlsx")
         assert xlsx.status_code == 200 and xlsx.content[:2] == b"PK", "xlsx not a ZIP"
         assert "spreadsheetml" in xlsx.headers["content-type"]

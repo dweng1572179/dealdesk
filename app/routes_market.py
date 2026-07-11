@@ -48,32 +48,60 @@ def match_why(request: Request, deal_id: int, lender_id: int, _=Depends(require_
 
 # --- underwriting model ------------------------------------------------------
 
-def _assumptions(amort: int, growth: float, hold: int, io_flag: str) -> dict:
-    return {"amort_years": max(1, amort), "noi_growth_pct": growth,
-            "hold_years": min(max(1, hold), 15), "interest_only": io_flag == "1"}
+def _assumptions(amort: int, growth: float, hold: int, io_flag: str,
+                 exitcap: str = "", cost: float = 2.0) -> dict:
+    out = {"amort_years": max(1, amort), "noi_growth_pct": growth,
+           "hold_years": min(max(1, hold), 30), "interest_only": io_flag == "1",
+           "sale_cost_pct": max(0.0, cost)}
+    ec = (exitcap or "").strip()
+    if ec:
+        try:
+            out["exit_cap_pct"] = float(ec)
+        except ValueError:
+            pass
+    return out
+
+
+def _sensitivity_grid(deal: dict, m: dict, kw: dict) -> dict | None:
+    """A rate × cap DSCR grid centered on the deal's own rate/cap (±). Needs both a
+    working rate and a cap (or a price to derive NOI) to be meaningful."""
+    rate = m.get("interest_rate")
+    cap = m.get("cap_rate")
+    if rate is None or cap is None or not deal.get("purchase_price"):
+        return None
+    rates = [round(rate + d, 2) for d in (-1.0, -0.5, 0.0, 0.5, 1.0) if rate + d > 0]
+    caps = [round(cap + d, 2) for d in (-1.0, -0.5, 0.0, 0.5, 1.0) if cap + d > 0]
+    grid_kw = {k: v for k, v in kw.items() if k in
+               ("amort_years", "noi_growth_pct", "hold_years", "interest_only")}
+    return underwriting.sensitivity(deal, rates, caps, **grid_kw)
 
 
 @app.get("/deal/{deal_id}/underwrite", response_class=HTMLResponse)
 def deal_underwrite(request: Request, deal_id: int, amort: int = 30, growth: float = 3.0,
-                    hold: int = 5, io: str = "", _=Depends(require_auth)):
+                    hold: int = 5, io: str = "", exitcap: str = "", cost: float = 2.0,
+                    _=Depends(require_auth)):
     deal = db.get_deal(deal_id)
     if not deal:
         return templates.TemplateResponse("_error.html", {"request": request, "msg": "Unknown deal."})
     # No activity row here — the assumptions form re-hits this on every knob change
     # (hx-trigger="change"), which would flood the feed. The .xlsx export logs once.
-    m = underwriting.compute(deal, **_assumptions(amort, growth, hold, io))
+    kw = _assumptions(amort, growth, hold, io, exitcap, cost)
+    m = underwriting.compute(deal, **kw)
+    grid = _sensitivity_grid(deal, m, kw)
     return templates.TemplateResponse(
-        "_underwrite.html", {"request": request, "deal": deal, "m": m})
+        "_underwrite.html", {"request": request, "deal": deal, "m": m, "grid": grid})
 
 
 @app.get("/deal/{deal_id}/model.xlsx")
 def deal_model_xlsx(deal_id: int, amort: int = 30, growth: float = 3.0, hold: int = 5,
-                    io: str = "", _=Depends(require_auth)):
+                    io: str = "", exitcap: str = "", cost: float = 2.0,
+                    _=Depends(require_auth)):
     deal = db.get_deal(deal_id)
     if not deal:
         return HTMLResponse("Unknown deal.", status_code=404)
-    m = underwriting.compute(deal, **_assumptions(amort, growth, hold, io))
-    data = underwriting.workbook(deal, m)
+    kw = _assumptions(amort, growth, hold, io, exitcap, cost)
+    m = underwriting.compute(deal, **kw)
+    data = underwriting.workbook(deal, m, _sensitivity_grid(deal, m, kw))
     db.add_activity("agent", f"Exported underwriting model for {deal['name']}", deal_id)
     fname = "".join(c if c.isalnum() else "_" for c in deal["name"])[:60] or "model"
     return StreamingResponse(
