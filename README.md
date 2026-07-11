@@ -1,12 +1,42 @@
 # DealDesk
 
+[![CI](https://github.com/dweng1572179/dealdesk/actions/workflows/ci.yml/badge.svg)](https://github.com/dweng1572179/dealdesk/actions/workflows/ci.yml)
+
 Self-hosted, AI-native **commercial-real-estate deal workspace** — a
 bring-your-own-keys, own-it alternative to [Lev](https://www.lev.com). **Cortex**,
 an AI agent over your deals; a CRM with pipeline boards, contacts, and companies;
-term extraction from your documents; an **Excel underwriting-model builder**; lender
-matching and market reference data against your own book; and an email loop — all on
-one small FastAPI service and a single SQLite file. No SaaS, no per-seat pricing,
-your data stays on your box.
+a **dashboard** with weighted pipeline and per-stage totals; **placements** (which
+lenders you shopped a deal to); term extraction and a document vault; an **Excel
+underwriting-model builder**; lender matching and market reference data against your
+own book; CSV import/export and one-click backup; and an email loop — all on one
+small FastAPI service and a single SQLite file. No SaaS, no per-seat pricing, your
+data stays on your box.
+
+## Screenshots
+
+> _Add your own once you've loaded data — the repo is the storefront. Drop PNGs in
+> `docs/` and reference them here; `[Home]`, `[A financing pipeline board]`, `[A deal
+> with its underwriting model + placements]`, and `[Market]` are the four that sell it._
+
+<!-- ![Dashboard](docs/dashboard.png) -->
+<!-- ![Deal detail](docs/deal.png) -->
+
+## 60-second setup
+
+```bash
+git clone https://github.com/dweng1572179/dealdesk && cd dealdesk
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env                 # set DEALDESK_PASSWORD (your login password)
+./run.sh                             # → http://localhost:8799, log in, done
+```
+
+That's the whole install — no database to provision, no services to wire up. First run
+seeds sample deals, a starter lender book, and market data so every screen has
+something in it. **Everything works with zero API keys**; add an Anthropic key in
+**Settings** (in the browser, applied live) to turn on the real agent, term
+extraction, and drafting. Non-technical? Double-click **Start DealDesk**
+(`.command` on Mac, `.bat` on Windows) instead.
 
 It shares its architecture with OpenProp (a sibling self-hosted app): one service,
 one password, free by default, paid AI only when you use it (metered against a
@@ -20,9 +50,13 @@ monthly cap).
 | Build Excel underwriting models (pro forma, DSCR, debt sizing) | **Build underwriting model** → a real `.xlsx` (sources/uses, debt sizing, DSCR, pro forma) from the deal, no key needed |
 | Term extraction from documents (~95%) | Upload a term sheet/OM → structured terms → apply to the deal |
 | Market moat: 7,287 lenders · 34 base rates · 16,133 loan comps | **Market** page — your own lender Directory, Base rates, and Recent-terms comps (seeded, then edit/import) |
-| Lender matching / placements | Match a deal to **your own** lender book; scored + explained |
-| CRE CRM: deals, contacts, companies, pipelines | Deals with Acquisition/Financing boards, contacts, companies, tasks |
-| Email microservice (Gmail/Outlook OAuth) | Stdlib IMAP/SMTP — connect any inbox with an App Password |
+| Lender matching | Match a deal to **your own** lender book; scored + explained |
+| Placements (where a deal was shopped) | **Placements** on every deal — shop it to matched lenders, track status + terms |
+| CRE CRM: deals, contacts, companies, pipelines | Deals with Acquisition/Financing boards; contacts↔companies↔deals; tasks; CSV import |
+| Home dashboard / pipeline insights | **Dashboard** — weighted pipeline, $ per stage, deal counts, theme-aware charts |
+| Deal document vault | **Files vault** — upload, extract terms, then view/download the original |
+| Export / reports | Deals·lenders·contacts·comps → **CSV**; one-click **SQLite backup/restore** |
+| Email microservice (Gmail/Outlook OAuth) | Stdlib IMAP/SMTP — connect any inbox with an App Password; test-connection button |
 | Pusher realtime feed | An activity feed the page polls every 15s |
 | Metronome + Stripe usage credits | A local monthly AI-spend cap |
 | Next.js + GraphQL microservices, Auth0, PostHog/Segment/Sentry | One FastAPI app, one password, no telemetry |
@@ -118,11 +152,18 @@ app/
   inbox.py          stdlib IMAP fetch + SMTP send
   docparse.py       PDF / .docx / text extraction
   matching.py       local lender scoring
-  settings_store.py DB-overrides-.env live settings
-  seed.py           first-run sample deals + lender book + market data
-  routes_*.py       deals · crm · agent · files · market(match/underwrite/data) · inbox · settings
+  csvimport.py      one robust CSV reader for every importer
+  settings_store.py DB-overrides-.env live settings + app flags
+  seed.py           first-run sample deals + lender book + market data (once, via a sentinel)
+  routes_*.py       deals · crm · agent · files · market · placements · inbox · settings · export
   templates/        Jinja + HTMX + Tailwind (CDN)
 ```
+
+## Continuous integration
+
+Both suites run on every push/PR (Python 3.11–3.13) with **no keys and no network** —
+see [`.github/workflows/ci.yml`](.github/workflows/ci.yml). If it's green, the whole
+app works offline on a clean checkout.
 
 ## What DealDesk deliberately is not
 

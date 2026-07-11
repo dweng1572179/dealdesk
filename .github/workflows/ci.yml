@@ -1,0 +1,29 @@
+name: CI
+
+# Both suites run with no keys and no network — every AI/email path exercises its
+# rules/template fallback — so CI needs no secrets.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the floor: db.serialize() (backup) and modern typing are used.
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Unit self-checks (ai · matching · underwriting · docparse · inbox · budget · csvimport · db)
+        run: python -m tests.test_units
+      - name: End-to-end smoke (HTTP: auth · deals · placements · vault · match · underwrite · market · CRM · export · backup)
+        run: python -m tests.test_smoke
