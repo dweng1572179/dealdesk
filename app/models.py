@@ -20,7 +20,7 @@ PROPERTY_TYPES = ["Multifamily", "Office", "Industrial", "Retail", "Mixed-Use",
                   "Hospitality", "Land", "Other"]
 LENDER_APPETITE = ["active", "selective", "paused"]
 
-# Where a deal stands with one lender you took it to (Lev's "Placements" column).
+# Where a deal stands with one lender you took it to (the CRM "Placements" column).
 PLACEMENT_STATUSES = ["shopped", "quoted", "passed", "selected", "dead"]
 
 # Probability a deal at this stage actually closes — the multiplier behind "weighted

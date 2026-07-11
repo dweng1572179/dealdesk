@@ -1,4 +1,4 @@
-"""First-run demo data — sample deals (the ones on Lev's Home screen) + a starter
+"""First-run demo data — sample deals + a starter
 lender book so matching works out of the box. Runs once, only into an empty DB;
 delete the rows or start fresh to clear it. Not real capital sources — replace the
 lender book with your own via CRM → Lenders → Import CSV."""
@@ -50,8 +50,8 @@ _LENDERS = [
 ]
 
 
-# Loan-pricing benchmarks. Static seed values — YOU keep these current (Lev streams
-# them live; the open version is BYO). Values are illustrative, ~mid-2026.
+# Loan-pricing benchmarks. Static seed values — YOU keep these current (no live
+# feed; the values are BYO). Values are illustrative, ~mid-2026.
 _BASE_RATES = [
     ("Prime", 6.75, 0.0, -0.25), ("SOFR (o/n)", 3.53, 0.01, -0.12),
     ("1-Mo SOFR", 3.58, 0.0, -0.10), ("Treasury 5-Yr", 3.85, 0.02, 0.09),

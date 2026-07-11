@@ -1,4 +1,4 @@
-"""The AI layer — Lev's whole pitch ("AI agent over your deals + term extraction +
+"""The AI layer — the whole pitch ("AI agent over your deals + term extraction +
 drafting + lender rationale") on one BYO Anthropic key. Structured features
 (term extraction) use messages.parse for schema-validated output; prose features
 (agent chat, email/memo drafting, match rationale) use plain messages.
@@ -35,7 +35,7 @@ def _text(resp) -> str | None:
 # --- 1. Agent chat (the centerpiece) ----------------------------------------
 
 _AGENT_SYS = (
-    "You are Cortex, DealDesk's assistant for a commercial-real-estate dealmaker. You "
+    "You are Scout, DealDesk's assistant for a commercial-real-estate dealmaker. You "
     "route a request to the right specialist (deal Q&A, underwriting, lender matching, "
     "memo drafting) and answer. You are "
     "given a JSON snapshot of the user's live deals (id, name, pipeline, stage, "
@@ -274,7 +274,7 @@ def deal_memo(deal: dict, contacts: list[dict], documents: list[dict]) -> str:
         return _memo_template(deal)
 
 
-# --- 6. Cortex agent with tool use (the real router→specialist behavior) -----
+# --- 6. Scout agent with tool use (the real router→specialist behavior) -----
 # The agent can DO things from chat — create/update deals, run an underwriting model,
 # match lenders, draft email, add tasks, and read a deal's documents (RAG). Manual
 # tool-use loop (no beta SDK dependency); adaptive thinking so it plans tool calls.
@@ -283,7 +283,7 @@ def deal_memo(deal: dict, contacts: list[dict], documents: list[dict]) -> str:
 AGENT_MAX_STEPS = 8   # ponytail: cap the loop; a CRE question rarely needs more turns
 
 _AGENT_TOOLS_SYS = (
-    "You are Cortex, DealDesk's agent for a commercial-real-estate dealmaker. You can "
+    "You are Scout, DealDesk's agent for a commercial-real-estate dealmaker. You can "
     "answer questions AND take actions on the user's workspace with the given tools: "
     "look up deals, create or update a deal, run an underwriting model, match a deal to "
     "the user's lender book, read a deal's uploaded documents, draft an email, and add "
@@ -367,7 +367,7 @@ def run_agent_tool(name: str, inp: dict) -> str:
             if fields.get("pipeline") not in ("acquisition", "financing"):
                 fields.pop("pipeline", None)
             did = db.create_deal(fields)
-            db.add_activity("agent", f"Cortex created deal {fields['name']}", did)
+            db.add_activity("agent", f"Scout created deal {fields['name']}", did)
             return f"Created deal id={did} '{fields['name']}'."
         if name == "update_deal":
             did = int(inp["deal_id"])
@@ -377,7 +377,7 @@ def run_agent_tool(name: str, inp: dict) -> str:
             if not fields:
                 return "ERROR: no updatable fields given."
             db.update_deal(did, fields)
-            db.add_activity("agent", f"Cortex updated {', '.join(fields)} on deal {did}", did)
+            db.add_activity("agent", f"Scout updated {', '.join(fields)} on deal {did}", did)
             return f"Updated deal {did}: {', '.join(fields)}."
         if name == "run_underwriting":
             d = db.get_deal(int(inp["deal_id"]))
@@ -410,7 +410,7 @@ def run_agent_tool(name: str, inp: dict) -> str:
                 return "ERROR: no deal with that id."
             body = draft_email(d, (inp.get("intent") or "Follow up on the deal.").strip(),
                                (inp.get("to_name") or "").strip())
-            db.add_activity("agent", f"Cortex drafted an email for {d['name']}", d["id"])
+            db.add_activity("agent", f"Scout drafted an email for {d['name']}", d["id"])
             return f"Draft ready (not sent):\n{body}"
         if name == "add_task":
             did = int(inp["deal_id"])
@@ -420,7 +420,7 @@ def run_agent_tool(name: str, inp: dict) -> str:
             if not body:
                 return "ERROR: task body is empty."
             db.add_task(did, body, (inp.get("due") or "").strip() or None)
-            db.add_activity("agent", f"Cortex added task to deal {did}: {body[:60]}", did)
+            db.add_activity("agent", f"Scout added task to deal {did}: {body[:60]}", did)
             return f"Added task to deal {did}."
         return f"ERROR: unknown tool {name}."
     except budget.BudgetExceeded:
@@ -431,7 +431,7 @@ def run_agent_tool(name: str, inp: dict) -> str:
 
 
 def agent_act(question: str, deals: list[dict] | None = None) -> str:
-    """The tool-using Cortex agent. Answers AND acts. Manual tool-use loop; falls back
+    """The tool-using Scout agent. Answers AND acts. Manual tool-use loop; falls back
     to keyword search with no key (same as agent_reply)."""
     from . import db
     if deals is None:

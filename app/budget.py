@@ -1,4 +1,4 @@
-"""AI spend meter + monthly cap — the open answer to Lev's Stripe credit system.
+"""AI spend meter + monthly cap — a local, own-your-usage take on metered-AI billing.
 Every billed LLM call books a flat per-feature estimate to the ai_call ledger;
 a call is refused if it would blow MONTHLY_BUDGET_CENTS. Flat estimates (not real
 token accounting) keep it a single knob — tune COSTS if your bills say otherwise."""

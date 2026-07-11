@@ -3,14 +3,14 @@
 
 <div class="mb-6">
   <h1 class="text-2xl font-semibold tracking-tight">How can I help with your deals?</h1>
-  <p class="text-sm text-slate-500">Ask <b>Cortex</b>, or tell it to <i>do</i> something — with a key it can
+  <p class="text-sm text-slate-500">Ask <b>Scout</b>, or tell it to <i>do</i> something — with a key it can
     create and update deals, run an underwriting model, match lenders, read a deal's documents, and draft
     email, all from chat.</p>
 </div>
 
 {% if not ai_on %}
 <div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-  No Anthropic key set — Cortex answers with keyword matching and can't take actions yet.
+  No Anthropic key set — Scout answers with keyword matching and can't take actions yet.
   Add your key in <a href="/settings" class="underline font-medium">Settings</a> for the full tool-using agent.
 </div>
 {% endif %}
@@ -78,7 +78,7 @@
     {% endif %}
   </div>
 
-  <!-- activity feed (polled — the open stand-in for Lev's Pusher realtime) -->
+  <!-- activity feed (polled every 15s — no websocket/push layer) -->
   <aside>
     <div class="rounded-xl border bg-white p-4">
       <div class="flex items-center justify-between mb-2">

@@ -1,4 +1,4 @@
-"""Placements — which lenders a deal was shopped to and where each stands (Lev's
+"""Placements — which lenders a deal was shopped to and where each stands (a real
 "Placements" deal column). Persisted from the match view ("shop this deal to X") and
 editable on the deal page. All HTMX partials targeting #placements."""
 from fastapi import Depends, Form, Request

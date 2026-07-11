@@ -1,11 +1,11 @@
-"""Market — the capital-markets hub. Three things Lev sells as a proprietary data
-moat, here running on data you own:
+"""Market — the capital-markets hub. Three things commercial platforms sell as a proprietary
+data moat, here running on data you own:
   • Lender matching   — rank your lender book against a deal (matching.py)
   • Underwriting model — build an Excel pro forma / DSCR / debt sizing (underwriting.py)
   • Market reference   — your Base rates + Recent-terms (closed-loan) comps, BYO/importable
 
-Lev's real edge is a live feed of 7,000+ lenders / 16,000+ loan comps / 34 rate
-benchmarks; the honest open trade is you maintain the reference data (seeded, then
+The commercial edge is a live feed of thousands of lenders and loan comps + rate
+benchmarks; the honest trade here is you maintain the reference data (seeded, then
 edit/import your own)."""
 from io import BytesIO  # imported directly: the xlsx route has an `io` query param that shadows the module
 

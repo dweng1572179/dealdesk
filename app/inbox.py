@@ -1,5 +1,4 @@
-"""Email loop — the open answer to Lev's dedicated email microservice + Gmail/
-Outlook OAuth. Here it's just Python's stdlib imaplib + smtplib against any inbox
+"""Email loop — no dedicated email microservice or Gmail/Outlook OAuth. Here it's just Python's stdlib imaplib + smtplib against any inbox
 you bring (Gmail/Outlook/Fastmail all speak IMAP+SMTP). Gmail/Outlook need an
 *App Password*, not your login password. No OAuth, no third-party service.
 

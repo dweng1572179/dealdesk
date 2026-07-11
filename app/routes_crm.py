@@ -1,6 +1,6 @@
 """CRM directory — contacts (brokers/lenders/sponsors) and your lender book. Lenders
-import from CSV so you can bring a real capital-provider list (the open answer to
-Lev's 7,000 lender profiles: you own the data)."""
+import from CSV so you can bring a real capital-provider directory —
+you own the data, no external feed."""
 from fastapi import Depends, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 

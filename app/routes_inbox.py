@@ -1,9 +1,9 @@
 """Inbox loop — sync recent email into per-deal threads + the activity feed, compose /
-reply / template, and send. Lev runs a dedicated email microservice with OAuth; here
+reply / template, and send. Instead of a dedicated email microservice with OAuth, here
 it's stdlib IMAP/SMTP against an inbox you connect in Settings, with synced + sent mail
 stored per deal (db.email) so each deal has a real thread.
 
-The activity feed is polled by HTMX (`/activity`), the open stand-in for Lev's Pusher."""
+The activity feed is polled by HTMX (`/activity`), in place of a websocket/push layer."""
 from fastapi import Depends, Form, Request
 from fastapi.responses import HTMLResponse
 
@@ -39,7 +39,7 @@ def inbox_sync(request: Request, _=Depends(require_auth)):
         mid = m.get("message_id")
         already = bool(mid) and db.email_exists(mid)
         # match the sender to a deal (its contact, else the deal name in the subject) so
-        # the message lands on the right thread (Lev's "Steve from Cain replied" → deal).
+        # the message lands on the right thread ("Steve from Cain replied" → the right deal).
         contact = db.contact_by_email(m["from_email"])
         deal_id = inbox.match_email_to_deal(m["from_email"], m["subject"], contact, deals)
         db.save_email("in", m["from_email"], None, m["subject"], m.get("body"),

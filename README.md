@@ -3,7 +3,7 @@
 [![CI](https://github.com/dweng1572179/dealdesk/actions/workflows/ci.yml/badge.svg)](https://github.com/dweng1572179/dealdesk/actions/workflows/ci.yml)
 
 Self-hosted, AI-native **commercial-real-estate deal workspace** — a
-bring-your-own-keys, own-it alternative to [Lev](https://www.lev.com). **Cortex**,
+bring-your-own-keys, own-your-data platform for CRE dealmakers. **Scout**,
 an AI agent over your deals; a CRM with pipeline boards, contacts, and companies;
 a **dashboard** with weighted pipeline and per-stage totals; **placements** (which
 lenders you shopped a deal to); term extraction and a document vault; an **Excel
@@ -14,11 +14,11 @@ data stays on your box.
 
 ## Screenshots
 
-**Dashboard** — Cortex agent, weighted pipeline, per-stage $ charts, activity feed:
+**Dashboard** — Scout agent, weighted pipeline, per-stage $ charts, activity feed:
 
 ![Dashboard](docs/dashboard.png)
 
-**Deal detail** — the Cortex action bar and a live underwriting model (DSCR, debt yield, exit cap, IRR):
+**Deal detail** — the Scout action bar and a live underwriting model (DSCR, debt yield, exit cap, IRR):
 
 ![Deal detail](docs/deal.png)
 
@@ -52,24 +52,26 @@ It shares its architecture with OpenProp (a sibling self-hosted app): one servic
 one password, free by default, paid AI only when you use it (metered against a
 monthly cap).
 
-## What it does (and how it maps to Lev)
+## What it does
 
-| Lev | DealDesk |
+The capabilities you'd expect from a commercial AI-native CRE platform — on your own box:
+
+| Capability | DealDesk |
 | --- | --- |
-| "Cortex" multi-agent router (chat over deals/files) | **Cortex** — a tool-using agent over your deals: from chat it creates/updates deals, runs an underwriting model, matches lenders, reads a deal's docs, and drafts email (one BYO model + tools, not a multi-model system) |
+| AI agent over your deals & files | **Scout** — a tool-using agent over your deals: from chat it creates/updates deals, runs an underwriting model, matches lenders, reads a deal's docs, and drafts email (one BYO model + tools) |
 | Build Excel underwriting models (pro forma, DSCR, debt sizing) | **Build underwriting model** → a real `.xlsx` (sources/uses, debt sizing, DSCR, pro forma) from the deal, no key needed |
-| Term extraction from documents (~95%) | Upload a term sheet/OM → structured terms → apply to the deal |
-| Market moat: 7,287 lenders · 34 base rates · 16,133 loan comps | **Market** page — your own lender Directory, Base rates, and Recent-terms comps (seeded, then edit/import) |
+| Term extraction from documents | Upload a term sheet/OM → structured terms → apply to the deal |
+| Capital-markets reference data | **Market** page — your own lender Directory, Base rates, and Recent-terms comps (seeded, then edit/import) |
 | Lender matching | Match a deal to **your own** lender book; scored + explained |
 | Placements (where a deal was shopped) | **Placements** on every deal — shop it to matched lenders, track status + terms |
 | CRE CRM: deals, contacts, companies, pipelines | Deals with Acquisition/Financing boards; contacts↔companies↔deals; tasks; CSV import |
 | Home dashboard / pipeline insights | **Dashboard** — weighted pipeline, $ per stage, deal counts, theme-aware charts |
 | Deal document vault | **Files vault** — upload, extract terms, then view/download the original |
 | Export / reports | Deals·lenders·contacts·comps → **CSV**; one-click **SQLite backup/restore** |
-| Email microservice (Gmail/Outlook OAuth) | Stdlib IMAP/SMTP — connect any inbox with an App Password; test-connection button |
-| Pusher realtime feed | An activity feed the page polls every 15s |
-| Metronome + Stripe usage credits | A local monthly AI-spend cap |
-| Next.js + GraphQL microservices, Auth0, PostHog/Segment/Sentry | One FastAPI app, one password, no telemetry |
+| Email (Gmail/Outlook) | Stdlib IMAP/SMTP — connect any inbox with an App Password; test-connection button |
+| Realtime activity feed | An activity feed the page polls every 15s |
+| Usage-metered AI billing | A local monthly AI-spend cap |
+| SaaS stack (SPA + microservices, third-party auth/analytics) | One FastAPI app, one password, no telemetry |
 
 Everything AI degrades to a **rules/template fallback** with no Anthropic key, so
 the CRM, boards, underwriting models, matching, market data, and CSV import all
@@ -108,7 +110,7 @@ your own any time (CRM → Lenders, or Market → Import CSV).
 
 ## Underwriting models
 
-On any deal, **Cortex actions → Build underwriting model** derives a lender-grade
+On any deal, **Scout actions → Build underwriting model** derives a lender-grade
 model from the deal's fields — fills the gaps (NOI from price×cap, loan from
 price×LTV), sizes the debt (amortizing or interest-only), and computes DSCR, debt
 yield, cash-on-cash, and a multi-year pro forma. Tune the amortization, NOI growth,
@@ -117,9 +119,8 @@ math — no Anthropic key required.
 
 ## Market data
 
-**Market** is your capital-markets reference set (the open answer to Lev's feed of
-7,000+ lenders / 16,000+ loan comps / 34 rate benchmarks — you own and maintain it):
-your lender **Directory**, **Base rates** (loan-pricing benchmarks), and **Recent
+**Market** is your capital-markets reference set — you own and maintain it, no live
+feed: your lender **Directory**, **Base rates** (loan-pricing benchmarks), and **Recent
 terms** (closed-loan comps). Seeded on first run; import your own via CSV:
 
 ```
@@ -157,7 +158,7 @@ app/
   db.py             SQLite schema + persistence (deals, contacts, companies, lenders, docs, tasks, activity, market data)
   models.py         pipelines/stages + the LLM term-extraction schema
   budget.py         AI spend meter + monthly cap
-  ai.py             Cortex agent · term extraction · drafting · memo · match rationale (rules fallback)
+  ai.py             Scout agent · term extraction · drafting · memo · match rationale (rules fallback)
   underwriting.py   deterministic Excel model builder (DSCR / debt sizing / pro forma)
   inbox.py          stdlib IMAP fetch + SMTP send
   docparse.py       PDF / .docx / text extraction
@@ -203,10 +204,10 @@ oversight.
 
 ## What DealDesk deliberately is not
 
-Lev's moat is a **live proprietary capital-markets feed** (real-time pricing and
-appetite from 7,000+ lenders, 16,000+ loan comps, 34 rate benchmarks) plus a
-server-side multi-model "Cortex" and a sales-led B2B stack. DealDesk has **no live
-feed** — its Market runs on data *you* seed and maintain, and Cortex is one BYO
+The moat of a commercial CRE platform is a **live proprietary capital-markets feed**
+(real-time pricing and appetite from thousands of lenders and loan comps) plus a
+server-side multi-model agent and a sales-led B2B stack. DealDesk has **no live
+feed** — its Market runs on data *you* seed and maintain, and Scout is one BYO
 model with a rules fallback. That's the honest trade: you own the data, the model
-key, and the deployment, instead of renting the intelligence Lev sells as a
-metered subscription.
+key, and the deployment, instead of renting the intelligence as a metered
+subscription.

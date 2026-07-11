@@ -1,5 +1,5 @@
-"""Lender matching — the open version of Lev's "match your deal to the right
-capital" over 7,000 lender profiles. Pure local scoring over YOUR lender book
+"""Lender matching — "match your deal to the right capital", scored locally over
+your own lender book. Pure local scoring over YOUR lender book
 (db.lender); no external data, no key. A deal + a lender -> a 0-100 fit score with
 explainable reasons. Optional AI pros/cons layer on top (ai.match_rationale)."""
 
@@ -77,7 +77,7 @@ def score(deal: dict, lender: dict) -> dict:
     return {"score": 0 if disq else min(pts, 100), "reasons": reasons, "disqualified": disq}
 
 
-# --- loan-comp matching ("similar closed loans" — the open version of Lev's comp set) --
+# --- loan-comp matching ("similar closed loans", scored over your own comp set) --
 
 def _comp_score(deal: dict, comp: dict) -> tuple[int, list[str]]:
     """How comparable a closed-loan comp is to this deal: asset type, state, leverage,
@@ -134,7 +134,7 @@ def rank_comps(deal: dict, comps: list[dict], limit: int = 8) -> list[dict]:
 def comp_pricing(deal: dict, comps: list[dict]) -> dict | None:
     """A comparable-pricing readout from the similar comps: the median closed rate and
     the range. This is the deal's 'market quote' off your own comp set — no live feed,
-    the honest open version of Lev's pricing signal."""
+    an honest, own-your-data pricing signal — no live feed."""
     top = [c for c in rank_comps(deal, comps) if c.get("rate")]
     if not top:
         return None

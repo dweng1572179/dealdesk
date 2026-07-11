@@ -1,4 +1,4 @@
-"""Underwriting model builder — Lev's headline agent deliverable ("provide a T-12 +
+"""Underwriting model builder — the headline agent deliverable ("provide a T-12 +
 Rent Roll → build an Excel underwriting model: pro forma, DSCR, debt sizing"). Here
 it's deterministic finance math (no LLM, no key) over a deal's fields, rendered to a
 real .xlsx via openpyxl. `compute()` is pure + tested; `workbook()` just formats it.

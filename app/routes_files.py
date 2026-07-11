@@ -1,6 +1,6 @@
 """Files — upload a term sheet / OM / email to a deal, extract text, pull structured
-terms (ai.extract_terms), and optionally apply them to the deal. This is Lev's
-"connect a document → terms extracted (~95%)" loop, BYO-key. The vault keeps the
+terms (ai.extract_terms), and optionally apply them to the deal. The
+"connect a document → terms extracted" loop, BYO-key. The vault keeps the
 original bytes so a document can be viewed or downloaded, not just re-read as text."""
 import mimetypes
 

@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS contact (
 );
 CREATE INDEX IF NOT EXISTS idx_contact_email ON contact(email);
 
--- Capital-markets side: your own lender book (the open answer to Lev's 7,000
--- lender profiles — you bring/import them, matching.py scores against them).
+-- Capital-markets side: your own lender book — you bring/import capital providers
+-- and matching.py scores them against a deal. No external directory.
 CREATE TABLE IF NOT EXISTS lender (
     id             INTEGER PRIMARY KEY,
     name           TEXT NOT NULL UNIQUE,
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS task (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- The realtime feed. Lev pushes this over Pusher; we just append rows and poll.
+-- The realtime feed. Just append rows and poll it — no websocket/push layer.
 CREATE TABLE IF NOT EXISTS activity (
     id         INTEGER PRIMARY KEY,
     deal_id    INTEGER REFERENCES deal(id) ON DELETE CASCADE,
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS activity (
 CREATE INDEX IF NOT EXISTS idx_activity_time ON activity(created_at);
 
 -- Email — synced inbound + sent outbound, attached to a deal so each deal has a thread
--- (Lev's per-deal email loop). Inbound is deduped by Message-ID; a NULL deal_id is an
+-- (a per-deal email loop). Inbound is deduped by Message-ID; a NULL deal_id is an
 -- email we couldn't match to a deal (still stored, shown in the global activity feed).
 CREATE TABLE IF NOT EXISTS email (
     id         INTEGER PRIMARY KEY,
@@ -115,8 +115,8 @@ CREATE TABLE IF NOT EXISTS ai_call (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_month ON ai_call(created_at);
 
--- Market data (the open version of Lev's capital-markets moat). You bring/maintain
--- it — Lev sells a proprietary feed; here it's your own reference data.
+-- Market data — a capital-markets reference set you bring and maintain. No live
+-- feed; it's your own data, not a rented proprietary one.
 CREATE TABLE IF NOT EXISTS base_rate (        -- loan-pricing benchmarks (Prime, SOFR, Treasuries…)
     id         INTEGER PRIMARY KEY,
     name       TEXT NOT NULL UNIQUE,
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS company (          -- CRM Companies (borrowers, spons
 );
 
 -- Placements — which lenders a deal was shopped to and where each stands. A real
--- Lev deal column. UNIQUE(deal_id, lender_name) makes "shop this deal to X"
+-- deal column in a CRE CRM. UNIQUE(deal_id, lender_name) makes "shop this deal to X"
 -- idempotent; lender_name is denormalized so a placement survives deleting the
 -- lender from your book (the history of who you called is not the lender's to erase).
 CREATE TABLE IF NOT EXISTS placement (
@@ -434,7 +434,7 @@ def delete_document(doc_id: int) -> int | None:
 
 def document_texts(deal_id: int, limit: int = 6, chars: int = 4000) -> list[dict]:
     """Extracted text of a deal's documents, for the agent to answer questions over
-    (the open version of Lev's per-deal RAG). ponytail: newest-N whole documents,
+    (per-deal document RAG). ponytail: newest-N whole documents,
     truncated — no chunking, no embeddings, no vector store. A single deal's papers fit
     in a modern context window. Add retrieval only when a deal outgrows the window."""
     with get_conn() as conn:

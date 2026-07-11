@@ -1,4 +1,4 @@
-"""The AI Agent — Lev's centerpiece. Chat over your deals, draft emails, generate a
+"""The AI Agent — the centerpiece. Chat over your deals, draft emails, generate a
 deal memo. Everything degrades to a rules/template fallback with no Anthropic key
 (ai.py), so these routes never hard-require a key."""
 from fastapi import Depends, Form, Request
