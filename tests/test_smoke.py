@@ -132,6 +132,22 @@ def run() -> None:
         assert "Connect an inbox" in c.post(f"/deal/{deal_id}/email/send",
                                             data={"to": "x@y.com", "subject": "s", "body": "b"}).text
 
+        # ── email threads: store an inbound email, render the thread, reply + template ──
+        eid = db.save_email("in", "steve@lender.com", None, "Term sheet for Test Tower",
+                            "Attached is our indicative term sheet.", deal_id=deal_id, message_id="<m1@x>")
+        assert eid and db.save_email("in", "steve@lender.com", None, "dup", "x",
+                                     deal_id=deal_id, message_id="<m1@x>") == eid, "message_id must dedup"
+        th = c.get(f"/deal/{deal_id}/emails")
+        assert th.status_code == 200 and "Term sheet for Test Tower" in th.text
+        # reply pre-fills To + a quoted Re: subject
+        rep = c.get(f"/deal/{deal_id}/email/compose?reply_to={eid}")
+        assert rep.status_code == 200 and "steve@lender.com" in rep.text and "Re: Term sheet" in rep.text
+        # a follow-up template fills subject + body from the deal
+        tpl = c.get(f"/deal/{deal_id}/email/compose?template=Follow-up")
+        assert tpl.status_code == 200 and "Test Tower" in tpl.text
+        # the deal page shows the Emails panel with the stored thread
+        assert "Term sheet for Test Tower" in c.get(f"/deal/{deal_id}").text
+
         # CRM: add a contact + a lender, import a CSV
         c.post("/crm/contact", data={"name": "Jane Broker", "role": "broker",
                "email": "jane@brk.com", "deal_id": str(deal_id)}, follow_redirects=True)

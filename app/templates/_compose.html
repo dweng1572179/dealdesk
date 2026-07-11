@@ -1,0 +1,25 @@
+{# Email compose box — new / reply / template-filled. Posts to /email/send which
+   re-renders the whole thread (#emails). Expects: deal_id, prefill {to,subject,body},
+   templates (names), email_on. #}
+<form class="rounded-lg border bg-slate-50/60 p-3 mt-2 space-y-2 text-sm"
+      hx-post="/deal/{{ deal_id }}/email/send" hx-target="#emails" hx-swap="outerHTML">
+  <div class="flex items-center gap-2">
+    <span class="text-xs font-medium text-slate-500">Compose</span>
+    <select class="ml-auto rounded border text-xs px-1.5 py-0.5 text-slate-600"
+            hx-get="/deal/{{ deal_id }}/email/compose" hx-target="#compose" hx-swap="innerHTML" name="template">
+      <option value="">template…</option>
+      {% for t in email_templates %}<option>{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <label class="block"><span class="text-xs text-slate-500">To</span>
+    <input name="to" value="{{ prefill.to }}" required placeholder="name@company.com"
+           class="mt-0.5 w-full rounded border px-2 py-1.5"></label>
+  <label class="block"><span class="text-xs text-slate-500">Subject</span>
+    <input name="subject" value="{{ prefill.subject }}" required class="mt-0.5 w-full rounded border px-2 py-1.5"></label>
+  <label class="block"><span class="text-xs text-slate-500">Body</span>
+    <textarea name="body" rows="7" required class="mt-0.5 w-full rounded border px-2 py-1.5 font-mono text-xs">{{ prefill.body }}</textarea></label>
+  <div class="flex items-center gap-3">
+    <button class="rounded-lg bg-indigo-600 px-3 py-1.5 text-white text-sm hover:bg-indigo-700">Send</button>
+    {% if not email_on %}<span class="text-xs text-amber-600">No inbox connected — connect one in Settings to send.</span>{% endif %}
+  </div>
+</form>

@@ -107,12 +107,15 @@ def _deal_ctx(request: Request, deal_id: int) -> dict | None:
     if not deal:
         return None
     from .models import PLACEMENT_STATUSES
+    from . import inbox
     ctx = base_ctx(request)
     ctx |= {
         "deal": deal,
         "tasks": db.list_tasks(deal_id),
         "documents": db.list_documents(deal_id),
         "contacts": db.list_contacts(deal_id),
+        "emails": db.list_emails(deal_id),
+        "email_templates": list(inbox.FOLLOWUP_TEMPLATES),
         "placements": db.list_placements(deal_id),
         "statuses": PLACEMENT_STATUSES,
         "companies": db.list_companies(),

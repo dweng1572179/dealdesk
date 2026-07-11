@@ -146,6 +146,16 @@
     </div>
 
     <div class="rounded-xl border bg-white p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold text-slate-700 text-sm">Emails</h3>
+        <button class="text-xs text-indigo-600 hover:underline"
+                hx-post="/inbox/sync" hx-target="#activity"
+                title="{% if email_on %}Pull recent email into deal threads{% else %}Connect an inbox in Settings first{% endif %}">sync inbox</button>
+      </div>
+      {% with flash=None, prefill=None %}{% include "_emails.html" %}{% endwith %}
+    </div>
+
+    <div class="rounded-xl border bg-white p-4">
       <h3 class="font-semibold text-slate-700 text-sm mb-2">Activity</h3>
       {% include "_activity.html" %}
     </div>

@@ -1,5 +1,5 @@
 {# Drafted email — editable, then send via SMTP (needs an inbox connected). #}
-<form class="rounded-xl border bg-white shadow-sm" hx-post="/deal/{{ deal_id }}/email/send" hx-target="#send-result">
+<form class="rounded-xl border bg-white shadow-sm" hx-post="/deal/{{ deal_id }}/email/send" hx-target="#emails" hx-swap="outerHTML">
   <div class="px-4 py-2 border-b bg-slate-50 text-sm text-slate-500">Draft — edit, then send</div>
   <div class="p-4 space-y-2">
     <label class="block"><span class="text-xs text-slate-500">To</span>

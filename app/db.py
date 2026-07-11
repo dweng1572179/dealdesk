@@ -86,6 +86,20 @@ CREATE TABLE IF NOT EXISTS activity (
 );
 CREATE INDEX IF NOT EXISTS idx_activity_time ON activity(created_at);
 
+-- Email — synced inbound + sent outbound, attached to a deal so each deal has a thread
+-- (Lev's per-deal email loop). Inbound is deduped by Message-ID; a NULL deal_id is an
+-- email we couldn't match to a deal (still stored, shown in the global activity feed).
+CREATE TABLE IF NOT EXISTS email (
+    id         INTEGER PRIMARY KEY,
+    deal_id    INTEGER REFERENCES deal(id) ON DELETE SET NULL,
+    direction  TEXT NOT NULL,          -- 'in' | 'out'
+    from_addr  TEXT, to_addr TEXT,
+    subject    TEXT, body TEXT,
+    message_id TEXT UNIQUE,            -- dedup key for synced inbound (NULL for outbound)
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_email_deal ON email(deal_id);
+
 -- Runtime config editable from /settings; overrides .env live. Local plaintext.
 CREATE TABLE IF NOT EXISTS setting (
     key   TEXT PRIMARY KEY,
@@ -493,6 +507,44 @@ def list_activity(limit: int = 30, deal_id: int | None = None) -> list[dict]:
     q += " ORDER BY a.id DESC LIMIT ?"
     with get_conn() as conn:
         return _rows(conn.execute(q, args + (limit,)))
+
+
+# --- email (per-deal threads) ------------------------------------------------
+
+def save_email(direction: str, from_addr: str | None, to_addr: str | None, subject: str | None,
+               body: str | None, deal_id: int | None = None, message_id: str | None = None) -> int | None:
+    """Store one email. Inbound is deduped by message_id — a repeat sync of the same
+    message returns the existing row's id (INSERT OR IGNORE, then look it up) rather than
+    a duplicate. Returns the row id (existing or new), or None if the insert was ignored
+    and no message_id was given to find it by."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO email (deal_id, direction, from_addr, to_addr, subject, "
+            "body, message_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (deal_id, direction, from_addr, to_addr, subject, body, message_id))
+        if cur.rowcount:
+            return cur.lastrowid
+        if message_id:
+            row = conn.execute("SELECT id FROM email WHERE message_id = ?", (message_id,)).fetchone()
+            return row["id"] if row else None
+        return None
+
+
+def list_emails(deal_id: int | None = None, limit: int = 50) -> list[dict]:
+    q = ("SELECT e.*, d.name AS deal_name FROM email e LEFT JOIN deal d ON d.id = e.deal_id")
+    args: tuple = ()
+    if deal_id is not None:
+        q += " WHERE e.deal_id = ?"
+        args = (deal_id,)
+    q += " ORDER BY e.id DESC LIMIT ?"
+    with get_conn() as conn:
+        return _rows(conn.execute(q, args + (limit,)))
+
+
+def get_email(email_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM email WHERE id = ?", (email_id,)).fetchone()
+    return dict(row) if row else None
 
 
 # --- market data (base rates, loan comps) ------------------------------------

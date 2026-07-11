@@ -23,6 +23,59 @@ def configured() -> bool:
     return bool(settings.email_user and settings.email_password)
 
 
+# Canned follow-up templates the compose form offers. {deal}/{city}/{sponsor} are filled
+# from the deal; {name} is the recipient. ponytail: a small fixed set — enough for the
+# common broker touches; make them user-editable only if someone asks.
+FOLLOWUP_TEMPLATES: dict[str, dict] = {
+    "Follow-up": {
+        "subject": "{deal} — following up",
+        "body": "Hi {name},\n\nCircling back on {deal}. Happy to resend the package or answer "
+                "any questions — where do things stand on your end?\n\nBest,\n"},
+    "Request term sheet": {
+        "subject": "{deal} — term sheet request",
+        "body": "Hi {name},\n\nThanks for the interest in {deal}. When you have a moment, could "
+                "you send over an indicative term sheet? Glad to hop on a call to walk through "
+                "the numbers.\n\nBest,\n"},
+    "Intro / teaser": {
+        "subject": "{deal} — financing opportunity",
+        "body": "Hi {name},\n\nI'm bringing {deal}{city_clause} to market and thought it might fit "
+                "your box. Sending the teaser and underwriting — let me know if you'd like the full "
+                "package.\n\nBest,\n"},
+    "Status update": {
+        "subject": "{deal} — status update",
+        "body": "Hi {name},\n\nQuick update on {deal}: [status]. Next steps are [next]. Let me know "
+                "if anything's needed from your side.\n\nBest,\n"},
+}
+
+
+def fill_template(name: str, deal: dict, to_name: str = "") -> dict | None:
+    """Return {subject, body} for a named template filled from the deal, or None if the
+    template name is unknown."""
+    t = FOLLOWUP_TEMPLATES.get(name)
+    if not t:
+        return None
+    city = deal.get("city")
+    ctx = {"deal": deal.get("name", "the deal"), "name": to_name or "there",
+           "city": city or "", "sponsor": deal.get("sponsor", ""),
+           "city_clause": f" in {city}" if city else ""}
+    return {"subject": t["subject"].format(**ctx), "body": t["body"].format(**ctx)}
+
+
+def match_email_to_deal(from_email: str, subject: str, contact: dict | None,
+                        deals: list[dict]) -> int | None:
+    """Pick the deal an inbound email belongs to. Prefer the sender's contact's deal;
+    otherwise a deal whose name appears in the subject (longest name first, so a specific
+    match beats a generic token). Pure — the caller supplies the contact + deals."""
+    if contact and contact.get("deal_id"):
+        return contact["deal_id"]
+    subj = (subject or "").lower()
+    for d in sorted(deals, key=lambda x: -len(x.get("name") or "")):
+        name = (d.get("name") or "").strip().lower()
+        if len(name) >= 4 and name in subj:
+            return d["id"]
+    return None
+
+
 def _decode(raw) -> str:
     try:
         return str(make_header(decode_header(raw or "")))
@@ -122,6 +175,7 @@ def fetch(limit: int = 15) -> list[dict]:
                 "from_email": from_email.lower(),
                 "subject": _decode(msg.get("Subject")) or "(no subject)",
                 "date": _decode(msg.get("Date")),
+                "message_id": (msg.get("Message-ID") or "").strip() or None,
                 "body": _body_text(msg).strip()[:8000],
             })
     finally:
@@ -147,6 +201,18 @@ def demo() -> None:
     # codec NAME) — it falls back to utf-8 rather than aborting the whole sync.
     assert _safe_decode(b"hi there", "x-unknown-8bit") == "hi there"
     assert _safe_decode(b"\xff\xfe", "totally-made-up") != ""
+
+    # follow-up templates fill from the deal
+    t = fill_template("Follow-up", {"name": "Harbor Pointe", "city": "Austin"}, to_name="Pat")
+    assert "Harbor Pointe" in t["subject"] and "Pat" in t["body"], t
+    assert fill_template("Intro / teaser", {"name": "X", "city": "Austin"})["body"].count("in Austin") == 1
+    assert fill_template("nope", {}) is None
+
+    # sender→deal matching: contact's deal wins; else a deal name in the subject
+    deals = [{"id": 1, "name": "Harbor Pointe Apartments"}, {"id": 2, "name": "Riverbend"}]
+    assert match_email_to_deal("x@y.com", "re: anything", {"deal_id": 7}, deals) == 7
+    assert match_email_to_deal("x@y.com", "Re: Harbor Pointe Apartments term sheet", None, deals) == 1
+    assert match_email_to_deal("x@y.com", "unrelated subject", None, deals) is None
     print("inbox.demo OK")
 
 
