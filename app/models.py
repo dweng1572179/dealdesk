@@ -80,3 +80,11 @@ class ExtractedTerms(BaseModel):
         # `summary` isn't a deal column — it rides along for the activity note only.
         out.pop("summary", None)
         return out
+
+
+class OMNarrative(BaseModel):
+    """Prose sections for the offering-memorandum generator. Two required fields, one a
+    list of short strings — well within the structured-output limits (see ExtractedTerms
+    for why the schema stays lean)."""
+    summary: str
+    highlights: list[str]

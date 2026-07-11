@@ -34,6 +34,8 @@
         <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
                 hx-post="/deal/{{ deal.id }}/memo" hx-target="#panel" hx-indicator="#panel-spin">Generate memo</button>
         <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
+                hx-post="/deal/{{ deal.id }}/om" hx-target="#panel" hx-indicator="#panel-spin">Offering memo</button>
+        <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
                 onclick="document.getElementById('draftbox').classList.toggle('hidden')">Draft email</button>
         <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
                 onclick="document.getElementById('uploadbox').classList.toggle('hidden')">Upload document</button>

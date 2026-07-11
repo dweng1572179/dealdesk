@@ -88,6 +88,11 @@ def run() -> None:
         mkt = c.get("/market")
         assert mkt.status_code == 200 and "Base rates" in mkt.text and "Prime" in mkt.text
 
+        # offering memorandum (template narrative + underwriting + comps, no key)
+        om = c.post(f"/deal/{deal_id}/om")
+        assert om.status_code == 200 and "Offering memorandum" in om.text
+        assert "Executive summary" in om.text and "Financing request" in om.text
+
         # comparable loans for the deal (seeded comps include Multifamily/TX)
         cm = c.get(f"/deal/{deal_id}/comps")
         assert cm.status_code == 200 and "Comparable loans" in cm.text

@@ -1,0 +1,86 @@
+{# Offering memorandum — a full sectioned document. Self-contained styling (a scoped
+   <style> block, no Tailwind classes inside .om-doc) so the "download" button can save
+   it as a standalone, print-ready HTML file. Rendered into #panel.
+   Expects: deal, m (underwriting model), comps, pricing, narrative {summary,highlights}, contacts. #}
+{% macro money(v) %}{% if v is not none and v != '' %}${{ '{:,.0f}'.format(v) }}{% else %}—{% endif %}{% endmacro %}
+{% macro pct(v) %}{% if v is not none and v != '' %}{{ v }}%{% else %}—{% endif %}{% endmacro %}
+<div class="rounded-xl border bg-white shadow-sm">
+  <div class="px-4 py-2 border-b bg-slate-50 flex items-center justify-between">
+    <span class="text-sm text-slate-500">Offering memorandum · <b>{{ deal.name }}</b></span>
+    <button class="text-xs text-indigo-600 hover:underline"
+            data-fname="{{ deal.name|replace(' ','_') }}_OM.html"
+            onclick="const d=this.closest('.rounded-xl').querySelector('.om-doc');const html='<!doctype html><meta charset=utf-8><title>{{ deal.name }} — Offering Memorandum</title>'+d.outerHTML;const b=new Blob([html],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=this.dataset.fname;a.click()">download .html ↓</button>
+  </div>
+
+  <div class="om-doc" style="max-width:760px;margin:0 auto;padding:32px 40px;color:#1e293b;font:15px/1.55 system-ui,-apple-system,'Segoe UI',sans-serif;background:#fff">
+    <style>
+      .om-doc h1{font-size:26px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px}
+      .om-doc h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#4f46e5;margin:26px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
+      .om-doc .sub{color:#64748b;font-size:14px;margin-bottom:2px}
+      .om-doc table{width:100%;border-collapse:collapse;font-size:14px;margin-top:4px}
+      .om-doc td{padding:5px 0;border-bottom:1px solid #f1f5f9}
+      .om-doc td.k{color:#64748b}.om-doc td.v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+      .om-doc ul{margin:6px 0 0;padding-left:18px}.om-doc li{margin:3px 0}
+      .om-doc .foot{margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px}
+      @media print{.om-doc{padding:0}}
+    </style>
+
+    <h1>{{ deal.name }}</h1>
+    <div class="sub">{{ [deal.property_type, deal.city, deal.state]|select|join(' · ') }}</div>
+    <div class="sub">Offering Memorandum{% if deal.sponsor %} · Sponsor: {{ deal.sponsor }}{% endif %}</div>
+
+    <h2>Executive summary</h2>
+    <p>{{ narrative.summary }}</p>
+    {% if narrative.highlights %}
+    <h2>Investment highlights</h2>
+    <ul>{% for h in narrative.highlights %}<li>{{ h }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    <h2>Financing request</h2>
+    <table>
+      <tr><td class="k">Purchase price</td><td class="v">{{ money(m.purchase_price) }}</td></tr>
+      <tr><td class="k">Loan amount</td><td class="v">{{ money(m.loan_amount) }}</td></tr>
+      <tr><td class="k">Equity required</td><td class="v">{{ money(m.equity) }}</td></tr>
+      <tr><td class="k">Loan-to-value</td><td class="v">{{ pct(m.ltv) }}</td></tr>
+      <tr><td class="k">Interest rate</td><td class="v">{{ pct(m.interest_rate) }}</td></tr>
+    </table>
+
+    <h2>Financial summary</h2>
+    <table>
+      <tr><td class="k">Year-1 NOI</td><td class="v">{{ money(m.noi) }}</td></tr>
+      <tr><td class="k">Cap rate</td><td class="v">{{ pct(m.cap_rate) }}</td></tr>
+      <tr><td class="k">Annual debt service</td><td class="v">{{ money(m.annual_debt_service) }}</td></tr>
+      <tr><td class="k">DSCR</td><td class="v">{{ m.dscr if m.dscr is not none else '—' }}</td></tr>
+      <tr><td class="k">Debt yield</td><td class="v">{{ pct(m.debt_yield_pct) }}</td></tr>
+      <tr><td class="k">Cash-on-cash</td><td class="v">{{ pct(m.cash_on_cash_pct) }}</td></tr>
+      {% if m.returns and m.returns.irr_pct is not none %}
+      <tr><td class="k">Projected levered IRR ({{ m.assumptions.hold_years }}-yr hold)</td><td class="v">{{ pct(m.returns.irr_pct) }}</td></tr>
+      <tr><td class="k">Equity multiple</td><td class="v">{{ m.returns.equity_multiple }}x</td></tr>
+      {% endif %}
+    </table>
+
+    {% if pricing %}
+    <h2>Comparable financing</h2>
+    <p style="margin:4px 0 0">Recent closed loans on comparable assets indicate a market rate around
+      <b>{{ pricing.rate_median }}%</b> (range {{ pricing.rate_low }}%–{{ pricing.rate_high }}%){% if pricing.ltv_avg %} at ~{{ pricing.ltv_avg }}% LTV{% endif %},
+      from {{ pricing.n }} comparable{{ '' if pricing.n == 1 else 's' }}.</p>
+    {% if comps %}
+    <table style="margin-top:8px">
+      <tr><td class="k" style="font-weight:600">Asset · State</td><td class="k" style="font-weight:600;text-align:right">LTV / Rate · Issued</td></tr>
+      {% for c in comps %}
+      <tr><td>{{ c.asset_type or '—' }}{% if c.state %} · {{ c.state }}{% endif %}</td>
+        <td class="v">{% if c.ltv %}{{ c.ltv }}% /{% endif %} {% if c.rate %}{{ c.rate }}%{% endif %}{% if c.issued %} · {{ c.issued }}{% endif %}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    {% endif %}
+
+    {% if deal.sponsor or contacts %}
+    <h2>Sponsor &amp; contacts</h2>
+    {% if deal.sponsor %}<p style="margin:2px 0">{{ deal.sponsor }}</p>{% endif %}
+    {% if contacts %}<ul>{% for c in contacts %}<li>{{ c.name }}{% if c.role %} — {{ c.role }}{% endif %}{% if c.email %} · {{ c.email }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+    {% endif %}
+
+    <div class="foot">Generated by DealDesk from deal data{% if narrative.summary and '⚠️' not in narrative.summary %}{% endif %}. Figures are illustrative and for discussion only — not an offer or commitment to lend. Verify all terms independently. Tip: use your browser's Print → Save as PDF for a PDF copy.</div>
+  </div>
+</div>

@@ -12,7 +12,7 @@ import re
 
 from . import budget
 from .config import settings
-from .models import ExtractedTerms
+from .models import ExtractedTerms, OMNarrative
 
 log = logging.getLogger("dealdesk")
 
@@ -468,6 +468,61 @@ def agent_act(question: str, deals: list[dict] | None = None) -> str:
         return _agent_rules(question, deals)
 
 
+# --- 7. Offering memorandum narrative -----------------------------------------
+
+def om_narrative(deal: dict, documents: list[dict]) -> dict:
+    """Prose sections for an offering memorandum — an executive summary and 3-5
+    investment highlights. AI when a key is set; a filled template otherwise. The
+    deterministic sections (financials, comps, key terms) are assembled by the caller
+    from the underwriting model, so this only writes the narrative. Returns
+    {summary: str, highlights: [str, ...]}."""
+    if not available():
+        return _om_template(deal)
+    try:
+        with budget.charge("docgen"):
+            resp = _client().messages.parse(
+                model=settings.llm_model, max_tokens=900,
+                system=("Write the narrative for a one-page CRE offering memorandum / lender "
+                        "teaser from the deal data. summary is 2-3 sentences of plain prose (no "
+                        "markdown, no headers). highlights is 3-5 short investment-highlight "
+                        "bullets. Use ONLY the facts given; do not invent numbers or names."),
+                messages=[{"role": "user", "content": json.dumps(deal, default=str)}],
+                output_format=OMNarrative)
+        parsed: OMNarrative = resp.parsed_output
+        return {"summary": parsed.summary or _om_template(deal)["summary"],
+                "highlights": [h for h in parsed.highlights if h.strip()] or _om_template(deal)["highlights"]}
+    except budget.BudgetExceeded as e:
+        return {"summary": f"⚠️ {e}", "highlights": []}
+    except Exception as e:  # noqa: BLE001
+        log.warning("om_narrative failed (%s): %s", type(e).__name__, e)
+        return _om_template(deal)
+
+
+def _om_template(deal: dict) -> dict:
+    """No-key OM narrative: assembled from the deal's own fields."""
+    name = deal.get("name", "the asset")
+    ptype = (deal.get("property_type") or "commercial").lower()
+    where = ", ".join(x for x in (deal.get("city"), deal.get("state")) if x)
+    price = deal.get("purchase_price")
+    summary = (f"{name} is a {ptype} asset"
+               f"{' in ' + where if where else ''}"
+               f"{' priced at $' + format(price, ',') if price else ''}"
+               f"{', sponsored by ' + deal['sponsor'] if deal.get('sponsor') else ''}. "
+               "This memorandum summarizes the financing request and key terms for lender review.")
+    hl = []
+    if deal.get("cap_rate"):
+        hl.append(f"{deal['cap_rate']}% going-in cap rate")
+    if deal.get("dscr"):
+        hl.append(f"{deal['dscr']}x debt-service coverage")
+    if deal.get("ltv"):
+        hl.append(f"{deal['ltv']}% loan-to-value request")
+    if deal.get("property_type"):
+        hl.append(f"{deal['property_type']} asset class")
+    if not hl:
+        hl.append("Add pricing and loan terms to the deal to populate highlights.")
+    return {"summary": summary, "highlights": hl}
+
+
 def _memo_template(deal: dict) -> str:
     def f(k, money=False):
         v = deal.get(k)
@@ -547,7 +602,13 @@ def demo() -> None:
     assert _db.list_tasks(did), "agent add_task did not persist"
     assert "no deal with that id" in run_agent_tool("update_deal", {"deal_id": 99999, "notes": "x"})
     assert "unknown tool" in run_agent_tool("bogus", {})
-    print("ai.demo (rules fallback + agent tools) OK")
+
+    # OM narrative template (no key) fills from the deal's own fields
+    om = _om_template({"name": "Harbor Pointe", "property_type": "Multifamily", "city": "Austin",
+                       "state": "TX", "cap_rate": 5.2, "dscr": 1.28, "ltv": 68.0})
+    assert "Harbor Pointe" in om["summary"] and "Austin" in om["summary"], om
+    assert any("5.2% going-in cap" in h for h in om["highlights"]), om["highlights"]
+    print("ai.demo (rules fallback + agent tools + OM) OK")
 
 
 if __name__ == "__main__":

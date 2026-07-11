@@ -4,7 +4,7 @@ deal memo. Everything degrades to a rules/template fallback with no Anthropic ke
 from fastapi import Depends, Form, Request
 from fastapi.responses import HTMLResponse
 
-from . import ai, db
+from . import ai, db, matching, underwriting
 from .app import app, require_auth, templates
 
 
@@ -43,3 +43,24 @@ def deal_memo(request: Request, deal_id: int, _=Depends(require_auth)):
     db.add_activity("agent", f"Generated deal memo for {deal['name']}", deal_id)
     return templates.TemplateResponse(
         "_memo.html", {"request": request, "deal": deal, "markdown": md})
+
+
+def _om_ctx(request: Request, deal: dict) -> dict:
+    """Assemble a full offering memorandum: an AI/template narrative + deterministic
+    financial summary (the underwriting model) + comparable financing (loan comps)."""
+    model = underwriting.compute(deal)
+    comps = matching.rank_comps(deal, db.list_loan_comps(limit=100000))
+    pricing = matching.comp_pricing(deal, db.list_loan_comps(limit=100000))
+    narrative = ai.om_narrative(deal, db.list_documents(deal_id=deal["id"]))
+    return {"request": request, "deal": deal, "m": model, "comps": comps[:5],
+            "pricing": pricing, "narrative": narrative,
+            "contacts": db.list_contacts(deal["id"])}
+
+
+@app.post("/deal/{deal_id}/om", response_class=HTMLResponse)
+def deal_om(request: Request, deal_id: int, _=Depends(require_auth)):
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return templates.TemplateResponse("_error.html", {"request": request, "msg": "Unknown deal."})
+    db.add_activity("agent", f"Generated offering memorandum for {deal['name']}", deal_id)
+    return templates.TemplateResponse("_om.html", _om_ctx(request, deal))
