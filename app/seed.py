@@ -86,14 +86,8 @@ _COMPANIES = [
 ]
 
 
-def seed_if_empty() -> None:
-    # Sentinel, not an emptiness check: a user who clears the sample data to start
-    # clean (deletes every seeded deal AND lender) must NOT get the demo set re-inserted
-    # on the next restart. The seed runs exactly once per database.
-    from .settings_store import get_flag, set_flag
-    if get_flag("seeded") or db.list_deals() or db.list_lenders():
-        set_flag("seeded", "1")
-        return
+def _load_demo() -> None:
+    """Insert the demo deals + lender book + market data. Assumes an empty workspace."""
     for l in _LENDERS:
         db.upsert_lender(l)
     for d in _DEALS:
@@ -109,5 +103,56 @@ def seed_if_empty() -> None:
     db.add_activity("system",
                     "Welcome to DealDesk — sample deals, a starter lender book, and market "
                     "reference data loaded. Replace them with your own any time.")
-    from .settings_store import set_flag
+
+
+def seed_if_empty() -> None:
+    # Sentinel, not an emptiness check: a user who clears the sample data to start
+    # clean (deletes every seeded deal AND lender) must NOT get the demo set re-inserted
+    # on the next restart. The seed runs exactly once per database.
+    from .settings_store import get_flag, set_flag
+    if get_flag("seeded") or db.list_deals() or db.list_lenders():
+        set_flag("seeded", "1")
+        return
+    _load_demo()
     set_flag("seeded", "1")   # never re-seed this database, even if the user empties it
+
+
+# tables holding user/workspace data — everything EXCEPT `setting` (keys, flags) and the
+# AI spend ledger (billing history). Deleting a parent cascades to its children, but we
+# clear all of them explicitly so the order doesn't matter.
+_DATA_TABLES = ["placement", "email", "task", "document", "activity", "contact", "deal",
+                "lender", "company", "base_rate", "loan_comp"]
+
+
+def reset_workspace(reseed: bool = True) -> None:
+    """Wipe all workspace data (keeps your saved keys + spend ledger). Optionally reloads
+    the demo set. The 'demo/reset' toggle behind Settings — try the app, then start clean."""
+    from .settings_store import set_flag
+    with db.get_conn() as conn:
+        for t in _DATA_TABLES:
+            conn.execute(f"DELETE FROM {t}")
+    if reseed:
+        set_flag("seeded", "0")
+        _load_demo()
+    set_flag("seeded", "1")   # either way, don't auto-reseed on the next boot
+
+
+def demo() -> None:
+    import os
+    import tempfile
+    from . import db as _db
+    _db.settings.db_path = os.path.join(tempfile.mkdtemp(), "seed.db")
+    _db.init_db()
+    _load_demo()
+    assert _db.list_deals() and _db.list_lenders(), "demo data should load"
+    # reset to empty
+    reset_workspace(reseed=False)
+    assert not _db.list_deals() and not _db.list_lenders() and not _db.list_loan_comps(), "reset should empty it"
+    # reset with reseed reloads the demo set
+    reset_workspace(reseed=True)
+    assert _db.list_deals() and _db.list_lenders(), "reseed should reload demo data"
+    print("seed.demo (load + reset + reseed) OK")
+
+
+if __name__ == "__main__":
+    demo()

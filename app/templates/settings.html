@@ -68,6 +68,24 @@
         <span class="text-sm text-slate-400 font-normal">/ ${{ "%.2f"|format(budget_cents/100) }}</span></p>
       <p class="text-xs text-slate-400">${{ "%.2f"|format(remaining_cents/100) }} left before the cap blocks paid calls.</p>
     </div>
+
+    <div class="rounded-xl border bg-white p-4 text-sm">
+      <h3 class="font-semibold text-slate-700 mb-1">Workspace</h3>
+      <p class="text-xs text-slate-400 mb-2">Reset the deals, contacts, lenders, and market data. Your saved keys and settings are kept. Back up first if unsure.</p>
+      <div class="flex flex-wrap gap-2">
+        <form method="post" action="/settings/reset"
+              onsubmit="return confirm('Delete all workspace data and reload the demo sample set?')">
+          <input type="hidden" name="mode" value="demo">
+          <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50">Reload demo data</button>
+        </form>
+        <form method="post" action="/settings/reset"
+              onsubmit="return confirm('Delete ALL deals, contacts, lenders, emails, and market data? This cannot be undone.')">
+          <input type="hidden" name="mode" value="empty">
+          <button class="rounded-lg border border-rose-200 text-rose-600 px-3 py-1.5 hover:bg-rose-50">Clear everything</button>
+        </form>
+        <a href="/backup/dealdesk.db" class="rounded-lg border px-3 py-1.5 text-slate-600 hover:bg-slate-50">Back up first</a>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

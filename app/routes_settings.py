@@ -1,10 +1,10 @@
 """Settings — paste your Anthropic key + connect an inbox in the browser; saved to
 the DB and applied live (no restart). Secrets are never rendered back; a blank
 secret field keeps the stored value."""
-from fastapi import Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 
-from . import ai, budget, inbox, settings_store
+from . import ai, budget, inbox, seed, settings_store
 from .app import app, base_ctx, require_auth, templates
 from .config import settings
 from .settings_store import FIELDS
@@ -56,6 +56,14 @@ async def settings_save(request: Request, _=Depends(require_auth)):
             updates[name] = v
     settings_store.save(updates)
     return templates.TemplateResponse("settings.html", _ctx(request, saved=True))
+
+
+@app.post("/settings/reset")
+def settings_reset(mode: str = Form("demo"), _=Depends(require_auth)):
+    """Wipe workspace data. mode='demo' reloads the sample set; mode='empty' starts clean.
+    Keeps your saved keys + settings. Irreversible — the form confirms first."""
+    seed.reset_workspace(reseed=(mode != "empty"))
+    return RedirectResponse("/", status_code=303)
 
 
 @app.post("/settings/test/anthropic", response_class=HTMLResponse)

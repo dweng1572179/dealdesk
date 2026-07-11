@@ -27,6 +27,10 @@ data stays on your box.
 ![Market](docs/market.png)
 ![Deals board](docs/deals.png)
 
+**Dark mode** (toggle in the header or press `d`; `?` shows all keyboard shortcuts):
+
+![Dark mode](docs/dark.png)
+
 ## 60-second setup
 
 ```bash

@@ -226,6 +226,14 @@ def run() -> None:
         assert "No Anthropic key" in c.post("/settings/test/anthropic").text
         assert "No inbox connected" in c.post("/settings/test/email").text
 
+        # ── workspace reset (run LAST — it wipes the workspace) ──
+        assert c.post("/settings/reset", data={"mode": "empty"},
+                      follow_redirects=False).status_code == 303
+        assert not db.list_deals() and not db.list_lenders(), "clear-everything left data"
+        assert c.post("/settings/reset", data={"mode": "demo"},
+                      follow_redirects=False).status_code == 303
+        assert any(d["name"] == "Harbor Pointe Apartments" for d in db.list_deals()), "reload demo failed"
+
     print("test_smoke OK")
 
 

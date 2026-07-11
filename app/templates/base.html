@@ -4,15 +4,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}DealDesk{% endblock %}</title>
+  {# apply the saved theme before paint to avoid a flash of the wrong theme #}
+  <script>try{if(localStorage.dd_theme==='dark')document.documentElement.classList.add('dark')}catch(e){}</script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
     .htmx-indicator{opacity:0;transition:opacity .2s}.htmx-request .htmx-indicator{opacity:1}.htmx-request.htmx-indicator{opacity:1}
-    /* Chart tokens — theme-aware. One indigo hue at two intensities: the light track
-       is the raw figure, the dark fill the weighted/risk-adjusted one (sequential,
-       single hue = magnitude). Ready for dark mode (P2); today the app renders light. */
+    /* Chart tokens — theme-aware (system pref OR the manual .dark toggle). One indigo
+       hue at two intensities: light track = raw figure, dark fill = weighted. */
     .viz{--bar-track:#c7d2fe;--bar-fill:#4f46e5;--viz-grid:#e2e8f0}
     @media (prefers-color-scheme: dark){.viz{--bar-track:#3730a3;--bar-fill:#818cf8;--viz-grid:#334155}}
+    html.dark .viz{--bar-track:#3730a3;--bar-fill:#818cf8;--viz-grid:#334155}
+    /* Dark mode — ponytail: blanket overrides of the small, disciplined set of utility
+       classes the app actually uses, rather than adding dark: variants to every element.
+       Ceiling: if the utility vocabulary grows, migrate to Tailwind dark: variants. */
+    html.dark body{background:#0f172a;color:#e2e8f0}
+    html.dark .bg-white{background-color:#1e293b !important}
+    html.dark .bg-slate-50,html.dark .bg-slate-50\/50,html.dark .bg-slate-50\/60,html.dark .bg-slate-50\/40{background-color:#172033 !important}
+    html.dark .bg-slate-100{background-color:#334155 !important}
+    html.dark .border,html.dark .border-b,html.dark .border-t,html.dark .divide-y>*{border-color:#334155 !important}
+    html.dark .border-slate-100,html.dark .border-slate-200{border-color:#2b3a52 !important}
+    html.dark .text-slate-800,html.dark .text-slate-700,html.dark .text-slate-900{color:#e2e8f0 !important}
+    html.dark .text-slate-600,html.dark .text-slate-500{color:#94a3b8 !important}
+    html.dark .text-slate-400,html.dark .text-slate-300{color:#64748b !important}
+    html.dark input,html.dark select,html.dark textarea{background-color:#0f172a;color:#e2e8f0;border-color:#334155}
+    html.dark .shadow-sm{box-shadow:none}
+    html.dark .bg-amber-50{background-color:rgba(180,120,20,.16) !important}
+    html.dark .bg-emerald-50,html.dark .bg-emerald-50\/40{background-color:rgba(16,120,80,.16) !important}
+    html.dark .bg-rose-50{background-color:rgba(180,50,60,.16) !important}
+    html.dark .bg-indigo-50,html.dark .bg-indigo-50\/40,html.dark .bg-indigo-50\/50{background-color:rgba(99,102,241,.18) !important}
+    /* keyboard-shortcut help overlay */
+    #kbd-help[hidden]{display:none}
   </style>
 </head>
 <body class="h-full bg-slate-50 text-slate-800">
@@ -34,6 +56,8 @@
           AI spend <b>${{ "%.2f"|format(spend_cents/100) }}</b> / ${{ "%.2f"|format(budget_cents/100) }}
         </span>
         {% endif %}
+        <button id="theme-toggle" title="Toggle dark mode (press d)" aria-label="Toggle dark mode"
+                class="text-slate-400 hover:text-slate-700 text-base leading-none">◐</button>
         <a href="/settings" class="text-slate-400 hover:text-slate-700">settings</a>
         <a href="/logout" class="text-slate-400 hover:text-slate-700">logout</a>
       </div>
@@ -42,5 +66,39 @@
   <main class="mx-auto max-w-6xl px-4 py-6">
     {% block content %}{% endblock %}
   </main>
+
+  {# keyboard-shortcut help overlay #}
+  <div id="kbd-help" hidden class="fixed inset-0 z-30 flex items-center justify-center bg-black/40" onclick="this.hidden=true">
+    <div class="rounded-xl border bg-white p-5 shadow-lg w-72 text-sm" onclick="event.stopPropagation()">
+      <h3 class="font-semibold text-slate-700 mb-2">Keyboard shortcuts</h3>
+      <ul class="space-y-1 text-slate-600">
+        <li><kbd class="px-1 rounded bg-slate-100 border text-xs">g</kbd> then <kbd class="px-1 rounded bg-slate-100 border text-xs">h/d/c/m/b</kbd> — go to Home / Deals / CRM / Market / Backup</li>
+        <li><kbd class="px-1 rounded bg-slate-100 border text-xs">/</kbd> — focus search / ask box</li>
+        <li><kbd class="px-1 rounded bg-slate-100 border text-xs">n</kbd> — new deal (on Deals)</li>
+        <li><kbd class="px-1 rounded bg-slate-100 border text-xs">d</kbd> — toggle dark mode</li>
+        <li><kbd class="px-1 rounded bg-slate-100 border text-xs">?</kbd> — this help · <kbd class="px-1 rounded bg-slate-100 border text-xs">Esc</kbd> — close</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    function setTheme(dark){document.documentElement.classList.toggle('dark',dark);try{localStorage.dd_theme=dark?'dark':'light'}catch(e){}}
+    document.getElementById('theme-toggle').addEventListener('click',function(){setTheme(!document.documentElement.classList.contains('dark'))});
+    var help=document.getElementById('kbd-help');
+    var pendingG=false;
+    function typing(e){var t=e.target,n=t.tagName;return n==='INPUT'||n==='TEXTAREA'||n==='SELECT'||t.isContentEditable}
+    document.addEventListener('keydown',function(e){
+      if(e.key==='Escape'){help.hidden=true;if(document.activeElement)document.activeElement.blur();return}
+      if(typing(e)||e.metaKey||e.ctrlKey||e.altKey)return;
+      if(pendingG){pendingG=false;var go={h:'/',d:'/deals',c:'/crm',m:'/market',b:'/backup'}[e.key];if(go){e.preventDefault();location.href=go;return}}
+      if(e.key==='g'){pendingG=true;setTimeout(function(){pendingG=false},900);return}
+      if(e.key==='/'){var s=document.querySelector('input[name="question"],input[name="q"],input[type="search"]');if(s){e.preventDefault();s.focus()}return}
+      if(e.key==='n'){var nb=document.getElementById('new-deal');if(nb){e.preventDefault();nb.classList.toggle('hidden');var f=nb.querySelector('input[name="name"]');if(f&&!nb.classList.contains('hidden'))f.focus()}return}
+      if(e.key==='d'){setTheme(!document.documentElement.classList.contains('dark'));return}
+      if(e.key==='?'){help.hidden=!help.hidden;return}
+    });
+  })();
+  </script>
 </body>
 </html>
