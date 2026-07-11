@@ -1,0 +1,44 @@
+{# Side-by-side loan scenarios — one column per structure, metrics as rows. The base-rate
+   picker prices an index+spread scenario (rate-based pricing). Rendered into #panel.
+   Expects: deal, scenarios [{label, model}], rates, base (selected rate id), spread. #}
+{% macro money(v) %}{% if v is not none %}${{ '{:,.0f}'.format(v) }}{% else %}<span class="text-slate-300">—</span>{% endif %}{% endmacro %}
+{% macro pct(v) %}{% if v is not none %}{{ v }}%{% else %}<span class="text-slate-300">—</span>{% endif %}{% endmacro %}
+<div class="rounded-xl border bg-white shadow-sm">
+  <div class="px-4 py-2 border-b bg-slate-50 text-sm text-slate-500">Loan scenarios · <b>{{ deal.name }}</b></div>
+
+  <form class="px-4 py-3 border-b flex flex-wrap items-end gap-3 text-sm bg-slate-50/50"
+        hx-get="/deal/{{ deal.id }}/scenarios" hx-target="#panel" hx-trigger="change">
+    <label><span class="text-xs text-slate-500">Price off a base rate</span>
+      <select name="base" class="mt-1 rounded border px-2 py-1">
+        <option value="">— (no priced scenario)</option>
+        {% for r in rates %}<option value="{{ r.id }}" {{ 'selected' if base == r.id|string else '' }}>{{ r.name }}{% if r.value is not none %} ({{ r.value }}%){% endif %}</option>{% endfor %}
+      </select></label>
+    <label><span class="text-xs text-slate-500">Spread (bps)</span>
+      <input name="spread" type="number" step="25" value="{{ spread }}" class="mt-1 w-24 rounded border px-2 py-1"></label>
+  </form>
+
+  <div class="p-4 overflow-x-auto">
+    <table class="text-sm min-w-full">
+      <thead><tr class="text-left">
+        <th class="py-1 pr-4 text-xs text-slate-400 font-medium">Structure</th>
+        {% for s in scenarios %}<th class="px-3 py-1 text-xs font-semibold text-slate-600 whitespace-nowrap">{{ s.label }}</th>{% endfor %}
+      </tr></thead>
+      <tbody class="divide-y">
+        {% set rows = [("Interest rate","interest_rate","pct"),("Loan","loan_amount","money"),
+          ("Annual debt service","annual_debt_service","money"),("DSCR","dscr","raw"),
+          ("Debt yield","debt_yield_pct","pct"),("Cash-on-cash","cash_on_cash_pct","pct")] %}
+        {% for label, key, fmt in rows %}
+        <tr>
+          <td class="py-1.5 pr-4 text-slate-500 whitespace-nowrap">{{ label }}</td>
+          {% for s in scenarios %}
+          {% set v = s.model[key] %}
+          <td class="px-3 py-1.5 tabular-nums {{ 'font-medium' if key == 'dscr' else '' }} {{ ('text-emerald-600' if v and v >= 1.25 else ('text-rose-600' if v is not none and v < 1.0 else '')) if key == 'dscr' else '' }}">
+            {% if fmt == 'money' %}{{ money(v) }}{% elif fmt == 'pct' %}{{ pct(v) }}{% else %}{{ v if v is not none else '—' }}{% endif %}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="mt-3 text-xs text-slate-400">Structures compared at the deal's price, cap rate, and leverage — only the loan terms change. Interest-only frees cash flow; the rate stress and index+spread quote show pricing sensitivity.</p>
+  </div>
+</div>

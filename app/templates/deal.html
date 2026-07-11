@@ -30,6 +30,8 @@
         <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
                 hx-get="/deal/{{ deal.id }}/match" hx-target="#panel" hx-indicator="#panel-spin">Match lenders</button>
         <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
+                hx-get="/deal/{{ deal.id }}/scenarios" hx-target="#panel" hx-indicator="#panel-spin">Loan scenarios</button>
+        <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
                 hx-get="/deal/{{ deal.id }}/comps" hx-target="#panel" hx-indicator="#panel-spin">Comparable loans</button>
         <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
                 hx-post="/deal/{{ deal.id }}/memo" hx-target="#panel" hx-indicator="#panel-spin">Generate memo</button>

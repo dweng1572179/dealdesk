@@ -79,6 +79,12 @@ def run() -> None:
         assert "DSCR sensitivity" in uw.text, "sensitivity grid missing"
         # exit cap knob flows through
         assert c.get(f"/deal/{deal_id}/underwrite?exitcap=7.5").status_code == 200
+        # loan scenarios: base structures + a base-rate-priced scenario
+        sc = c.get(f"/deal/{deal_id}/scenarios")
+        assert sc.status_code == 200 and "As entered" in sc.text and "Interest-only" in sc.text
+        rate_id = db.list_base_rates()[0]["id"]
+        scp = c.get(f"/deal/{deal_id}/scenarios?base={rate_id}&spread=250")
+        assert scp.status_code == 200 and "bps =" in scp.text, "priced scenario missing"
         # a real .xlsx download (now with exit + grid sheets)
         xlsx = c.get(f"/deal/{deal_id}/model.xlsx")
         assert xlsx.status_code == 200 and xlsx.content[:2] == b"PK", "xlsx not a ZIP"

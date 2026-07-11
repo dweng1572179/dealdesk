@@ -169,6 +169,25 @@ def compute(deal: dict, amort_years: int = 30, noi_growth_pct: float = 3.0,
     }
 
 
+def loan_scenarios(deal: dict, base_rate: float | None = None, spread_bps: float | None = None,
+                   base_name: str = "") -> list[dict]:
+    """Compute the deal under several loan STRUCTURES for a side-by-side comparison — the
+    lender/scenario table a broker builds by hand. Each entry is {label, model}. Always
+    includes the deal as entered, an interest-only variant, and a +100bps rate stress;
+    adds a base-rate-priced quote (index + spread) when one is given."""
+    out = [{"label": "As entered", "model": compute(deal)},
+           {"label": "Interest-only", "model": compute(deal, interest_only=True)}]
+    rate = deal.get("interest_rate")
+    if rate is not None:
+        out.append({"label": "Rate +100 bps",
+                    "model": compute({**deal, "interest_rate": rate + 1.0})})
+    priced = price_from_base(base_rate, spread_bps)
+    if priced is not None:
+        label = (f"{base_name or 'Base'} {base_rate}% + {spread_bps:g} bps = {priced}%")
+        out.append({"label": label, "model": compute({**deal, "interest_rate": priced})})
+    return out
+
+
 def sensitivity(deal: dict, rates: list[float], caps: list[float], **kw) -> dict:
     """A rate × cap grid of DSCR — how coverage holds up as pricing and exit values
     move. Rows are interest rates, columns are cap rates; each cell recomputes the
@@ -364,6 +383,23 @@ def demo() -> None:
     # --- price_from_base: index + spread --------------------------------------
     assert price_from_base(4.15, 250) == 6.65
     assert price_from_base(None, 250) is None
+
+    # --- loan scenarios: side-by-side structures ------------------------------
+    sc_deal = {"purchase_price": 20_000_000, "ltv": 65.0, "cap_rate": 6.0, "interest_rate": 6.5}
+    sc = loan_scenarios(sc_deal, base_rate=4.15, spread_bps=250, base_name="UST 10Y")
+    labels = [s["label"] for s in sc]
+    assert labels[0] == "As entered" and "Interest-only" in labels, labels
+    assert any("Rate +100 bps" == l for l in labels), labels
+    assert any("6.65%" in l for l in labels), labels   # 4.15 + 250bps priced scenario
+    # rate stress lowers DSCR vs as-entered
+    base_dscr = sc[0]["model"]["dscr"]
+    stress = next(s for s in sc if s["label"] == "Rate +100 bps")["model"]["dscr"]
+    assert stress < base_dscr, (base_dscr, stress)
+    # interest-only lowers debt service vs amortizing → higher DSCR
+    io = next(s for s in sc if s["label"] == "Interest-only")["model"]
+    assert io["dscr"] > base_dscr, (base_dscr, io["dscr"])
+    # a deal with no rate still returns the base + IO scenarios (no stress/priced)
+    assert len(loan_scenarios({"purchase_price": 10_000_000, "ltv": 60.0, "cap_rate": 6.0})) == 2
 
     # --- sensitivity grid: DSCR falls as the rate rises, rises as cap rises ----
     grid = sensitivity({"purchase_price": 20_000_000, "ltv": 65.0},

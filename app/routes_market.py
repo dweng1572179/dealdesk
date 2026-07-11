@@ -106,6 +106,27 @@ def deal_underwrite(request: Request, deal_id: int, amort: int = 30, growth: flo
         "_underwrite.html", {"request": request, "deal": deal, "m": m, "grid": grid})
 
 
+@app.get("/deal/{deal_id}/scenarios", response_class=HTMLResponse)
+def deal_scenarios(request: Request, deal_id: int, base: str = "", spread: str = "",
+                   _=Depends(require_auth)):
+    """Side-by-side loan structures for a deal. `base` is a base_rate id + `spread` bps →
+    an index+spread priced scenario (rate-based pricing off the base-rate table)."""
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return templates.TemplateResponse("_error.html", {"request": request, "msg": "Unknown deal."})
+    base_rate, base_name, spread_bps = None, "", None
+    rates = db.list_base_rates()
+    if base.isdigit():
+        r = next((x for x in rates if x["id"] == int(base)), None)
+        if r and r["value"] is not None:
+            base_rate, base_name = r["value"], r["name"]
+            spread_bps = _num(spread) if spread.strip() else 250.0
+    scenarios = underwriting.loan_scenarios(deal, base_rate, spread_bps, base_name)
+    return templates.TemplateResponse("_scenarios.html", {
+        "request": request, "deal": deal, "scenarios": scenarios, "rates": rates,
+        "base": base, "spread": spread or "250"})
+
+
 @app.get("/deal/{deal_id}/model.xlsx")
 def deal_model_xlsx(deal_id: int, amort: int = 30, growth: float = 3.0, hold: int = 5,
                     io: str = "", exitcap: str = "", cost: float = 2.0,
