@@ -1,0 +1,22 @@
+{# Contact list. Included in deal.html + crm.html, returned standalone on delete.
+   scope_deal_id keeps the delete re-render scoped to the deal panel it lives in. #}
+{% set scope_deal_id = deal.id if deal is defined else (deal_id if deal_id is defined else '') %}
+{% if not contacts %}
+  <p class="text-sm text-slate-400">No contacts.</p>
+{% else %}
+<ul class="divide-y text-sm">
+  {% for c in contacts %}
+  <li class="py-2 flex items-start justify-between gap-2 group">
+    <div class="min-w-0">
+      <div class="font-medium">{{ c.name }}{% if c.role %} <span class="text-xs text-slate-400">· {{ c.role }}</span>{% endif %}</div>
+      <div class="text-xs text-slate-500 truncate">
+        {{ [c.org, c.email, c.phone]|select|join(' · ') }}
+      </div>
+    </div>
+    <button class="text-xs text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100"
+            hx-delete="/contact/{{ c.id }}" hx-target="#contacts" hx-confirm="Delete this contact?"
+            {% if scope_deal_id %}hx-vals='{"deal_id": "{{ scope_deal_id }}"}'{% endif %}>✕</button>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

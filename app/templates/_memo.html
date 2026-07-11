@@ -1,0 +1,11 @@
+{# Generated deal memo (Markdown). Editable textarea so it's easy to copy into your
+   own doc; download saves a .md file. #}
+<div class="rounded-xl border bg-white shadow-sm">
+  <div class="px-4 py-2 border-b bg-slate-50 flex items-center justify-between">
+    <span class="text-sm text-slate-500">Deal memo · Markdown</span>
+    <button class="text-xs text-indigo-600 hover:underline"
+            data-fname="{{ deal.name|replace(' ','_') }}_memo.md"
+            onclick="const t=this.closest('.rounded-xl').querySelector('textarea');const b=new Blob([t.value],{type:'text/markdown'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=this.dataset.fname;a.click()">download .md</button>
+  </div>
+  <textarea rows="18" class="w-full p-4 text-sm font-mono border-0 focus:ring-0 resize-y">{{ markdown }}</textarea>
+</div>

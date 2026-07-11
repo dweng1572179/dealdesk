@@ -1,0 +1,18 @@
+{# Task list. Included in deal.html (has `deal`) and returned standalone (has `deal_id`). #}
+{% set did = deal_id if deal_id is defined else deal.id %}
+{% if not tasks %}
+  <p class="text-sm text-slate-400">No tasks yet.</p>
+{% else %}
+<ul class="space-y-1.5 text-sm">
+  {% for t in tasks %}
+  <li class="flex items-center gap-2 group">
+    <input type="checkbox" {{ 'checked' if t.done else '' }}
+           hx-post="/task/{{ t.id }}/toggle" hx-target="#tasks" hx-vals='{"done": "{{ 0 if t.done else 1 }}"}'>
+    <span class="flex-1 {{ 'line-through text-slate-400' if t.done else '' }}">{{ t.body }}</span>
+    {% if t.due %}<span class="text-xs text-slate-400">{{ t.due }}</span>{% endif %}
+    <button class="text-xs text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100"
+            hx-delete="/task/{{ t.id }}" hx-target="#tasks">✕</button>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

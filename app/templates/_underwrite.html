@@ -1,0 +1,54 @@
+{# Underwriting model preview + assumptions + .xlsx download. Rendered into #panel. #}
+{% macro money(v) %}{% if v is not none %}${{ '{:,.0f}'.format(v) }}{% else %}<span class="text-slate-300">—</span>{% endif %}{% endmacro %}
+{% macro pct(v) %}{% if v is not none %}{{ v }}%{% else %}<span class="text-slate-300">—</span>{% endif %}{% endmacro %}
+{% set a = m.assumptions %}
+{% set q = "amort=%s&growth=%s&hold=%s&io=%s"|format(a.amort_years, a.noi_growth_pct, a.hold_years, '1' if a.interest_only else '') %}
+<div class="rounded-xl border bg-white shadow-sm">
+  <div class="px-4 py-2 border-b bg-slate-50 flex items-center justify-between">
+    <span class="text-sm text-slate-500">Underwriting · <b>{{ deal.name }}</b></span>
+    <a href="/deal/{{ deal.id }}/model.xlsx?{{ q }}" class="text-xs text-indigo-600 hover:underline">download .xlsx ↓</a>
+  </div>
+
+  <form class="px-4 py-3 border-b flex flex-wrap items-end gap-3 text-sm bg-slate-50/50"
+        hx-get="/deal/{{ deal.id }}/underwrite" hx-target="#panel" hx-trigger="change">
+    <label><span class="text-xs text-slate-500">Amort (yrs)</span>
+      <input name="amort" type="number" value="{{ a.amort_years }}" class="mt-1 w-20 rounded border px-2 py-1"></label>
+    <label><span class="text-xs text-slate-500">NOI growth %</span>
+      <input name="growth" type="number" step="0.5" value="{{ a.noi_growth_pct }}" class="mt-1 w-20 rounded border px-2 py-1"></label>
+    <label><span class="text-xs text-slate-500">Hold (yrs)</span>
+      <input name="hold" type="number" value="{{ a.hold_years }}" class="mt-1 w-20 rounded border px-2 py-1"></label>
+    <label class="flex items-center gap-1.5"><input type="checkbox" name="io" value="1" {{ 'checked' if a.interest_only else '' }}> <span class="text-xs text-slate-500">Interest-only</span></label>
+  </form>
+
+  <div class="grid sm:grid-cols-3 gap-x-6 gap-y-2 px-4 py-3 text-sm">
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">Loan</span><b>{{ money(m.loan_amount) }}</b></div>
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">Equity</span><b>{{ money(m.equity) }}</b></div>
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">LTV</span><b>{{ pct(m.ltv) }}</b></div>
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">Debt service</span><b>{{ money(m.annual_debt_service) }}</b></div>
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">DSCR</span>
+      <b class="{{ 'text-emerald-600' if m.dscr and m.dscr >= 1.25 else ('text-rose-600' if m.dscr and m.dscr < 1.0 else '') }}">{{ m.dscr if m.dscr is not none else '—' }}</b></div>
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">Debt yield</span><b>{{ pct(m.debt_yield_pct) }}</b></div>
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">Year-1 NOI</span><b>{{ money(m.noi) }}</b></div>
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">Cap rate</span><b>{{ pct(m.cap_rate) }}</b></div>
+    <div class="flex justify-between border-b border-slate-100 py-1"><span class="text-slate-500">Cash-on-cash</span><b>{{ pct(m.cash_on_cash_pct) }}</b></div>
+  </div>
+
+  {% if m.projection %}
+  <div class="px-4 pb-4 overflow-x-auto">
+    <h4 class="text-xs font-semibold text-slate-500 mb-1">Pro forma · {{ a.noi_growth_pct }}% NOI growth</h4>
+    <table class="w-full text-sm">
+      <thead class="text-xs text-slate-400 text-left"><tr>
+        <th class="py-1 pr-3">Year</th><th class="pr-3">NOI</th><th class="pr-3">Debt service</th><th class="pr-3">Cash flow</th><th>DSCR</th></tr></thead>
+      <tbody class="divide-y">
+        {% for p in m.projection %}
+        <tr><td class="py-1 pr-3">{{ p.year }}</td><td class="pr-3">{{ money(p.noi) }}</td>
+          <td class="pr-3">{{ money(p.debt_service) }}</td><td class="pr-3">{{ money(p.cash_flow) }}</td>
+          <td>{{ p.dscr if p.dscr is not none else '—' }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="px-4 pb-4 text-sm text-slate-400">Add a purchase price + cap rate (or NOI) and loan terms to this deal to size the model.</p>
+  {% endif %}
+</div>

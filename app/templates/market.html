@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}DealDesk — Market{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="text-2xl font-semibold tracking-tight">Market</h1>
+  <p class="text-sm text-slate-500">Your capital-markets reference data. Lev streams a live feed of thousands of
+    lenders and loan comps; here you own and maintain it.</p>
+</div>
+
+{% if imported %}
+<div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">Imported {{ imported.split(':')[1] }} {{ imported.split(':')[0] }}.</div>
+{% endif %}
+
+<div class="grid sm:grid-cols-3 gap-3 mb-6">
+  <a href="/crm" class="rounded-xl border bg-white p-4 hover:border-indigo-400">
+    <div class="text-2xl font-semibold">{{ lender_count }}</div>
+    <div class="text-sm text-slate-500">lenders in your Directory</div>
+  </a>
+  <div class="rounded-xl border bg-white p-4">
+    <div class="text-2xl font-semibold">{{ base_rates|length }}</div>
+    <div class="text-sm text-slate-500">base-rate benchmarks</div>
+  </div>
+  <div class="rounded-xl border bg-white p-4">
+    <div class="text-2xl font-semibold">{{ comps|length }}</div>
+    <div class="text-sm text-slate-500">recent-terms comps</div>
+  </div>
+</div>
+
+<!-- Base rates -->
+<section class="mb-8">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-semibold text-slate-700">Base rates <span class="text-sm text-slate-400">— loan-pricing benchmarks</span></h2>
+    <form method="post" action="/market/rates/import" enctype="multipart/form-data" class="flex items-center gap-2 text-sm">
+      <input type="file" name="file" accept=".csv" required class="text-xs">
+      <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50">Import CSV</button>
+    </form>
+  </div>
+  <div class="rounded-xl border bg-white p-4 overflow-x-auto">
+    {% if base_rates %}
+    <table class="w-full text-sm">
+      <thead class="text-xs text-slate-400 text-left"><tr><th class="py-1 pr-4">Benchmark</th><th class="pr-4">Rate</th><th class="pr-4">1-day</th><th class="pr-4">1-month</th><th>Updated</th></tr></thead>
+      <tbody class="divide-y">
+        {% for r in base_rates %}
+        <tr>
+          <td class="py-1.5 pr-4 font-medium">{{ r.name }}</td>
+          <td class="pr-4 font-medium">{% if r.value is not none %}{{ r.value }}%{% endif %}</td>
+          {% for d in [r.delta_1d, r.delta_1m] %}
+          <td class="pr-4 {{ 'text-emerald-600' if d and d > 0 else ('text-rose-600' if d and d < 0 else 'text-slate-400') }}">
+            {% if d is not none %}{{ '+' if d > 0 else '' }}{{ d }}{% endif %}</td>
+          {% endfor %}
+          <td class="text-slate-400 text-xs">{{ r.updated_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="text-sm text-slate-400">No base rates. Import a CSV (name,value,delta_1d,delta_1m).</p>{% endif %}
+  </div>
+</section>
+
+<!-- Recent terms -->
+<section>
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-semibold text-slate-700">Recent terms <span class="text-sm text-slate-400">— closed-loan comps</span></h2>
+    <form method="post" action="/market/comps/import" enctype="multipart/form-data" class="flex items-center gap-2 text-sm">
+      <input type="file" name="file" accept=".csv" required class="text-xs">
+      <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50">Import CSV</button>
+    </form>
+  </div>
+  <div id="comps" class="rounded-xl border bg-white p-4">{% include "_comps.html" %}</div>
+  <p class="mt-3 text-xs text-slate-400">CSV columns: asset_type, state, loan_purpose, capital_provider, ltv, rate, term_years, amort_years, recourse, issued, notes.</p>
+</section>
+{% endblock %}

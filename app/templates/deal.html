@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}DealDesk — {{ deal.name }}{% endblock %}
+{% macro money(v) %}{% if v %}${{ '{:,.0f}'.format(v) }}{% endif %}{% endmacro %}
+{% block content %}
+
+<div class="mb-4 flex items-start justify-between gap-4">
+  <div>
+    <a href="/deals?pipeline={{ deal.pipeline }}" class="text-sm text-indigo-600 hover:underline">← {{ deal.pipeline }} board</a>
+    <h1 class="text-2xl font-semibold tracking-tight">{{ deal.name }}</h1>
+    <p class="text-sm text-slate-500">
+      <span class="inline-block rounded-full bg-indigo-100 text-indigo-800 px-2 py-0.5 text-xs">{{ deal.stage }}</span>
+      {{ [deal.property_type, deal.city, deal.state]|select|join(' · ') }}
+      {% if deal.sponsor %}· {{ deal.sponsor }}{% endif %}
+    </p>
+  </div>
+  <form method="post" action="/deal/{{ deal.id }}/delete"
+        onsubmit="return confirm('Delete this deal and all its tasks, docs, and activity?')">
+    <button class="text-xs text-slate-400 hover:text-rose-600">delete</button>
+  </form>
+</div>
+
+<div class="grid lg:grid-cols-[1fr_340px] gap-6">
+  <div class="space-y-6">
+    <!-- AI actions -->
+    <div class="rounded-xl border bg-white p-4">
+      <h3 class="font-semibold text-slate-700 text-sm mb-3">Cortex actions <span class="font-normal text-xs text-slate-400">— the agent routes each to a specialist</span></h3>
+      <div class="flex flex-wrap gap-2 text-sm">
+        <button class="rounded-lg bg-indigo-600 px-3 py-1.5 text-white hover:bg-indigo-700"
+                hx-get="/deal/{{ deal.id }}/underwrite" hx-target="#panel" hx-indicator="#panel-spin">Build underwriting model</button>
+        <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
+                hx-get="/deal/{{ deal.id }}/match" hx-target="#panel" hx-indicator="#panel-spin">Match lenders</button>
+        <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
+                hx-post="/deal/{{ deal.id }}/memo" hx-target="#panel" hx-indicator="#panel-spin">Generate memo</button>
+        <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
+                onclick="document.getElementById('draftbox').classList.toggle('hidden')">Draft email</button>
+        <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50"
+                onclick="document.getElementById('uploadbox').classList.toggle('hidden')">Upload document</button>
+      </div>
+
+      <form id="draftbox" class="hidden mt-3 flex flex-wrap gap-2 items-end"
+            hx-post="/deal/{{ deal.id }}/draft" hx-target="#panel" hx-indicator="#panel-spin">
+        <label class="flex-1 min-w-[200px]"><span class="text-xs text-slate-500">What should the email do?</span>
+          <input name="intent" value="Follow up and ask for the latest term sheet."
+                 class="mt-1 w-full rounded-lg border px-3 py-2 text-sm"></label>
+        <label><span class="text-xs text-slate-500">To (name)</span>
+          <input name="to_name" class="mt-1 w-40 rounded-lg border px-3 py-2 text-sm"></label>
+        <button class="rounded-lg bg-indigo-600 px-3 py-2 text-white text-sm hover:bg-indigo-700">Draft</button>
+      </form>
+
+      <form id="uploadbox" class="hidden mt-3 flex flex-wrap gap-3 items-center"
+            hx-post="/deal/{{ deal.id }}/upload" hx-target="#panel" hx-indicator="#panel-spin"
+            hx-encoding="multipart/form-data">
+        <input type="file" name="file" required class="text-sm">
+        <label class="flex items-center gap-1.5 text-sm text-slate-600">
+          <input type="checkbox" name="apply" value="1"> apply extracted terms to this deal</label>
+        <button class="rounded-lg bg-indigo-600 px-3 py-2 text-white text-sm hover:bg-indigo-700">Extract terms</button>
+      </form>
+
+      <div id="panel-spin" class="htmx-indicator text-sm text-slate-400 mt-3">Working…</div>
+      <div id="panel" class="mt-3"></div>
+    </div>
+
+    <!-- editable fields -->
+    <form method="post" action="/deal/{{ deal.id }}" class="rounded-xl border bg-white p-4">
+      <h3 class="font-semibold text-slate-700 text-sm mb-3">Deal terms</h3>
+      <div class="grid sm:grid-cols-2 gap-3 text-sm">
+        {% macro field(name, label, val, extra="") %}
+        <label><span class="text-xs text-slate-500">{{ label }}</span>
+          <input name="{{ name }}" value="{{ val if val is not none else '' }}" {{ extra|safe }}
+                 class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+        {% endmacro %}
+        <label><span class="text-xs text-slate-500">Name</span>
+          <input name="name" value="{{ deal.name }}" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+        <label><span class="text-xs text-slate-500">Deal type</span>
+          <select name="deal_type" class="mt-1 w-full rounded-lg border px-3 py-2">
+            <option value="">—</option>{% for t in deal_types %}<option {{ 'selected' if deal.deal_type==t else '' }}>{{ t }}</option>{% endfor %}</select></label>
+        <label><span class="text-xs text-slate-500">Property type</span>
+          <select name="property_type" class="mt-1 w-full rounded-lg border px-3 py-2">
+            <option value="">—</option>{% for t in property_types %}<option {{ 'selected' if deal.property_type==t else '' }}>{{ t }}</option>{% endfor %}</select></label>
+        {{ field("sponsor", "Sponsor", deal.sponsor) }}
+        {{ field("address", "Address", deal.address) }}
+        {{ field("city", "City", deal.city) }}
+        {{ field("state", "State", deal.state) }}
+        {{ field("lender_name", "Lender", deal.lender_name) }}
+        {{ field("purchase_price", "Purchase price ($)", deal.purchase_price) }}
+        {{ field("loan_amount", "Loan amount ($)", deal.loan_amount) }}
+        {{ field("ltv", "LTV (%)", deal.ltv) }}
+        {{ field("interest_rate", "Interest rate (%)", deal.interest_rate) }}
+        {{ field("dscr", "DSCR", deal.dscr) }}
+        {{ field("cap_rate", "Cap rate (%)", deal.cap_rate) }}
+        {{ field("noi", "NOI ($)", deal.noi) }}
+        <label class="sm:col-span-2"><span class="text-xs text-slate-500">Notes</span>
+          <textarea name="notes" rows="3" class="mt-1 w-full rounded-lg border px-3 py-2">{{ deal.notes or '' }}</textarea></label>
+      </div>
+      <div class="mt-3 flex justify-end">
+        <button class="rounded-lg bg-slate-800 px-4 py-2 text-white text-sm hover:bg-slate-900">Save</button>
+      </div>
+    </form>
+
+    <!-- tasks -->
+    <div class="rounded-xl border bg-white p-4">
+      <h3 class="font-semibold text-slate-700 text-sm mb-3">Tasks</h3>
+      <form hx-post="/deal/{{ deal.id }}/task" hx-target="#tasks" class="flex gap-2 mb-3"
+            hx-on::after-request="this.reset()">
+        <input name="body" required placeholder="Call broker, order appraisal…" class="flex-1 rounded-lg border px-3 py-2 text-sm">
+        <input type="date" name="due" class="rounded-lg border px-2 py-2 text-sm text-slate-500">
+        <button class="rounded-lg bg-indigo-600 px-3 py-2 text-white text-sm hover:bg-indigo-700">Add</button>
+      </form>
+      <div id="tasks">{% include "_tasks.html" %}</div>
+    </div>
+  </div>
+
+  <!-- side: contacts, docs, activity -->
+  <aside class="space-y-6">
+    <div class="rounded-xl border bg-white p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold text-slate-700 text-sm">Contacts</h3>
+        <a href="/crm" class="text-xs text-indigo-600 hover:underline">+ add</a>
+      </div>
+      <div id="contacts">{% include "_contacts.html" %}</div>
+    </div>
+
+    <div class="rounded-xl border bg-white p-4">
+      <h3 class="font-semibold text-slate-700 text-sm mb-2">Documents</h3>
+      {% if documents %}
+      <ul class="space-y-1.5 text-sm">
+        {% for d in documents %}
+        <li><span class="text-slate-700">{{ d.filename }}</span>
+          <span class="text-xs text-slate-400">· {{ d.created_at }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="text-sm text-slate-400">No documents. Use “Upload document” above.</p>{% endif %}
+    </div>
+
+    <div class="rounded-xl border bg-white p-4">
+      <h3 class="font-semibold text-slate-700 text-sm mb-2">Activity</h3>
+      {% include "_activity.html" %}
+    </div>
+  </aside>
+</div>
+{% endblock %}

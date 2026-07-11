@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}DealDesk — CRM{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold tracking-tight mb-4">CRM</h1>
+
+{% if imported is not none %}
+<div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+  Imported {{ imported }} lender(s).
+</div>
+{% endif %}
+
+<!-- Lenders -->
+<section class="mb-8">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-semibold text-slate-700">Lender book <span class="text-sm text-slate-400">({{ lenders|length }})</span></h2>
+    <form method="post" action="/crm/lenders/import" enctype="multipart/form-data"
+          class="flex items-center gap-2 text-sm">
+      <input type="file" name="file" accept=".csv" required class="text-xs">
+      <button class="rounded-lg border px-3 py-1.5 hover:bg-slate-50">Import CSV</button>
+    </form>
+  </div>
+
+  <details class="mb-3 rounded-xl border bg-white p-4">
+    <summary class="cursor-pointer text-sm font-medium text-slate-600">+ Add a lender</summary>
+    <form method="post" action="/crm/lender" class="mt-3 grid sm:grid-cols-3 gap-3 text-sm">
+      <label><span class="text-xs text-slate-500">Name*</span><input name="name" required class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <label><span class="text-xs text-slate-500">Contact</span><input name="contact_name" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <label><span class="text-xs text-slate-500">Email</span><input name="email" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <label class="sm:col-span-3"><span class="text-xs text-slate-500">Property types (Ctrl/Cmd-click for several)</span>
+        <select name="property_types" multiple size="4" class="mt-1 w-full rounded-lg border px-3 py-2">
+          {% for t in property_types %}<option>{{ t }}</option>{% endfor %}</select></label>
+      <label><span class="text-xs text-slate-500">Loan types (comma-sep)</span><input name="loan_types" placeholder="acquisition, bridge" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <label><span class="text-xs text-slate-500">Geographies (states or US)</span><input name="geographies" placeholder="TX, AZ or US" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <label><span class="text-xs text-slate-500">Appetite</span>
+        <select name="appetite" class="mt-1 w-full rounded-lg border px-3 py-2">{% for a in appetites %}<option>{{ a }}</option>{% endfor %}</select></label>
+      <label><span class="text-xs text-slate-500">Min loan ($)</span><input name="min_loan" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <label><span class="text-xs text-slate-500">Max loan ($)</span><input name="max_loan" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <label><span class="text-xs text-slate-500">Max LTV (%)</span><input name="max_ltv" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <label class="sm:col-span-3"><span class="text-xs text-slate-500">Notes</span><input name="notes" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+      <div><button class="rounded-lg bg-indigo-600 px-4 py-2 text-white font-medium hover:bg-indigo-700">Add lender</button></div>
+    </form>
+  </details>
+
+  <div id="lenders" class="rounded-xl border bg-white p-4">{% include "_lenders.html" %}</div>
+</section>
+
+<!-- Contacts -->
+<section>
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-semibold text-slate-700">Contacts <span class="text-sm text-slate-400">({{ contacts|length }})</span></h2>
+  </div>
+  <form method="post" action="/crm/contact" class="mb-3 rounded-xl border bg-white p-4 grid sm:grid-cols-5 gap-3 text-sm">
+    <label><span class="text-xs text-slate-500">Name*</span><input name="name" required class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+    <label><span class="text-xs text-slate-500">Org</span><input name="org" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+    <label><span class="text-xs text-slate-500">Role</span>
+      <select name="role" class="mt-1 w-full rounded-lg border px-3 py-2">
+        {% for r in ["broker","lender","sponsor","attorney","other"] %}<option>{{ r }}</option>{% endfor %}</select></label>
+    <label><span class="text-xs text-slate-500">Email</span><input name="email" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+    <label><span class="text-xs text-slate-500">Deal</span>
+      <select name="deal_id" class="mt-1 w-full rounded-lg border px-3 py-2">
+        <option value="">—</option>{% for d in deals %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></label>
+    <div class="sm:col-span-5"><button class="rounded-lg bg-indigo-600 px-4 py-2 text-white font-medium hover:bg-indigo-700">Add contact</button></div>
+  </form>
+  <div id="contacts" class="rounded-xl border bg-white p-4">{% include "_contacts.html" %}</div>
+</section>
+
+<!-- Companies -->
+<section class="mt-8">
+  <h2 class="font-semibold text-slate-700 mb-3">Companies <span class="text-sm text-slate-400">({{ companies|length }})</span></h2>
+  <form method="post" action="/crm/company" class="mb-3 rounded-xl border bg-white p-4 grid sm:grid-cols-4 gap-3 text-sm">
+    <label><span class="text-xs text-slate-500">Name*</span><input name="name" required class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+    <label><span class="text-xs text-slate-500">Type</span>
+      <select name="type" class="mt-1 w-full rounded-lg border px-3 py-2">
+        {% for t in ["Sponsor","Borrower","Lender","Brokerage","Vendor","Other"] %}<option>{{ t }}</option>{% endfor %}</select></label>
+    <label><span class="text-xs text-slate-500">Location</span><input name="location" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+    <label><span class="text-xs text-slate-500">Website</span><input name="website" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+    <div class="sm:col-span-4"><button class="rounded-lg bg-indigo-600 px-4 py-2 text-white font-medium hover:bg-indigo-700">Add company</button></div>
+  </form>
+  <div id="companies" class="rounded-xl border bg-white p-4">{% include "_companies.html" %}</div>
+</section>
+{% endblock %}

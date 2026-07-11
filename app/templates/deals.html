@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}DealDesk — deals{% endblock %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-4">
+  <div class="flex items-center gap-3">
+    <h1 class="text-2xl font-semibold tracking-tight">Deals</h1>
+    <div class="flex rounded-lg border bg-white overflow-hidden text-sm">
+      {% for p in pipelines %}
+      <a href="/deals?pipeline={{ p }}"
+         class="px-3 py-1.5 capitalize {{ 'bg-indigo-600 text-white' if p == pipeline else 'text-slate-600 hover:bg-slate-50' }}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <button onclick="document.getElementById('new-deal').classList.toggle('hidden')"
+          class="rounded-lg bg-indigo-600 px-4 py-2 text-white text-sm font-medium hover:bg-indigo-700">+ New deal</button>
+</div>
+
+<form id="new-deal" method="post" action="/deals" class="hidden mb-5 rounded-xl border bg-white p-4 grid sm:grid-cols-3 gap-3">
+  <input type="hidden" name="pipeline" value="{{ pipeline }}">
+  <label class="sm:col-span-3"><span class="text-xs text-slate-500">Deal name</span>
+    <input name="name" required placeholder="Harbor Pointe Apartments" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+  <label><span class="text-xs text-slate-500">Property type</span>
+    <select name="property_type" class="mt-1 w-full rounded-lg border px-3 py-2">
+      <option value="">—</option>{% for t in property_types %}<option>{{ t }}</option>{% endfor %}</select></label>
+  <label><span class="text-xs text-slate-500">City</span><input name="city" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+  <label><span class="text-xs text-slate-500">State</span><input name="state" maxlength="2" class="mt-1 w-full rounded-lg border px-3 py-2 uppercase"></label>
+  <label><span class="text-xs text-slate-500">Loan amount ($)</span><input name="loan_amount" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+  <label><span class="text-xs text-slate-500">Sponsor</span><input name="sponsor" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+  <div class="flex items-end"><button class="rounded-lg bg-indigo-600 px-4 py-2 text-white text-sm font-medium hover:bg-indigo-700">Create</button></div>
+</form>
+
+<div id="board">{% include "_board.html" %}</div>
+{% endblock %}

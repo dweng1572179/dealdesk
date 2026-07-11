@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">How can I help with your deals?</h1>
+  <p class="text-sm text-slate-500">Ask <b>Cortex</b> about your pipeline, or draft an email — it reads your live deals and
+    routes each request to the right specialist (deal Q&A, underwriting, matching, memos).</p>
+</div>
+
+{% if not ai_on %}
+<div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+  No Anthropic key set — the agent answers with keyword matching and drafts from templates.
+  Add your key in <a href="/settings" class="underline font-medium">Settings</a> for the full agent.
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-[1fr_320px] gap-6">
+  <!-- agent -->
+  <div>
+    <form hx-post="/agent" hx-target="#agent-out" hx-indicator="#agent-spin"
+          hx-on::after-request="if(event.detail.successful) this.reset()"
+          class="flex gap-2">
+      <input name="question" required autofocus autocomplete="off"
+             placeholder="Which of my deals are closest to closing this month?"
+             class="flex-1 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <button class="rounded-lg bg-indigo-600 px-5 py-2 text-white font-medium hover:bg-indigo-700">Ask</button>
+    </form>
+    <div class="mt-2 flex flex-wrap gap-2 text-xs">
+      {% for s in ["Which deals are closest to closing?", "Summarize my financing pipeline", "Which deals have open tasks?"] %}
+      <button class="rounded-full border bg-white px-3 py-1 text-slate-600 hover:border-indigo-400"
+              hx-post="/agent" hx-target="#agent-out" hx-vals='{"question": {{ s|tojson }}}'>{{ s }}</button>
+      {% endfor %}
+    </div>
+    <div id="agent-spin" class="htmx-indicator text-sm text-slate-400 mt-3">Thinking…</div>
+    <div id="agent-out" class="mt-4"></div>
+
+    <div class="mt-8 grid sm:grid-cols-3 gap-3">
+      <a href="/deals" class="rounded-xl border bg-white p-4 hover:border-indigo-400">
+        <div class="text-2xl font-semibold">{{ deal_count }}</div>
+        <div class="text-sm text-slate-500">deals in pipeline</div>
+      </a>
+      <a href="/deals?pipeline=financing" class="rounded-xl border bg-white p-4 hover:border-indigo-400">
+        <div class="text-2xl font-semibold">{{ pipelines.get('financing', 0) }}</div>
+        <div class="text-sm text-slate-500">financing</div>
+      </a>
+      <a href="/crm" class="rounded-xl border bg-white p-4 hover:border-indigo-400">
+        <div class="text-2xl font-semibold">{{ lender_count }}</div>
+        <div class="text-sm text-slate-500">lenders in your book</div>
+      </a>
+    </div>
+
+    {% if open_tasks %}
+    <div class="mt-6 rounded-xl border bg-white p-4">
+      <h3 class="font-semibold text-slate-700 text-sm mb-2">Open tasks</h3>
+      <ul class="space-y-1.5 text-sm">
+        {% for t in open_tasks %}
+        <li class="flex justify-between gap-2">
+          <a href="/deal/{{ t.deal_id }}" class="hover:underline">{{ t.body }}</a>
+          <span class="text-slate-400 whitespace-nowrap">{{ t.deal_name }}{% if t.due %} · due {{ t.due }}{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- activity feed (polled — the open stand-in for Lev's Pusher realtime) -->
+  <aside>
+    <div class="rounded-xl border bg-white p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold text-slate-700 text-sm">Activity</h3>
+        <button class="text-xs text-indigo-600 hover:underline"
+                hx-post="/inbox/sync" hx-target="#activity" hx-indicator="#sync-spin"
+                title="{% if email_on %}Pull recent email into the feed{% else %}Connect an inbox in Settings first{% endif %}">
+          sync inbox
+        </button>
+      </div>
+      <span id="sync-spin" class="htmx-indicator text-xs text-slate-400">syncing…</span>
+      <div id="activity" hx-get="/activity" hx-trigger="every 15s" hx-swap="innerHTML">
+        {% include "_activity.html" %}
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

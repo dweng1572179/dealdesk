@@ -1,0 +1,17 @@
+{# Companies list. Included in crm.html, returned standalone on delete. #}
+{% if not companies %}
+  <p class="text-sm text-slate-400">No companies yet.</p>
+{% else %}
+<ul class="divide-y text-sm">
+  {% for c in companies %}
+  <li class="py-2 flex items-start justify-between gap-2 group">
+    <div class="min-w-0">
+      <div class="font-medium">{{ c.name }}{% if c.type %} <span class="text-xs text-slate-400">· {{ c.type }}</span>{% endif %}</div>
+      <div class="text-xs text-slate-500 truncate">{{ [c.location, c.website]|select|join(' · ') }}</div>
+    </div>
+    <button class="text-xs text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100"
+            hx-delete="/company/{{ c.id }}" hx-target="#companies" hx-confirm="Delete this company?">✕</button>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

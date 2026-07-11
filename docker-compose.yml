@@ -1,0 +1,14 @@
+# docker compose up  ->  http://localhost:8799
+# change the host port:  DEALDESK_PORT=9000 docker compose up   (or set it in .env)
+services:
+  dealdesk:
+    build: .
+    ports:
+      - "${DEALDESK_PORT:-8799}:8000"   # host -> container (container stays on 8000)
+    env_file: .env          # your keys + DEALDESK_PASSWORD
+    volumes:
+      - dealdesk-data:/app/data   # persists the SQLite DB (deals, settings) across restarts
+    restart: unless-stopped
+
+volumes:
+  dealdesk-data:

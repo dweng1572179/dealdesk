@@ -1,0 +1,18 @@
+{# Activity feed rows. Polled by home.html and re-rendered by /inbox/sync. #}
+{% set icons = {"email_in":"📥","email_out":"📤","agent":"🤖","extract":"📄","stage":"↗","note":"📝","system":"•"} %}
+{% if not activity %}
+  <p class="text-sm text-slate-400">No activity yet.</p>
+{% else %}
+<ul class="space-y-2 text-sm">
+  {% for a in activity %}
+  <li class="flex gap-2">
+    <span class="text-slate-400">{{ icons.get(a.kind, "•") }}</span>
+    <div class="min-w-0">
+      {% if a.deal_id %}<a href="/deal/{{ a.deal_id }}" class="hover:underline">{{ a.summary }}</a>
+      {% else %}<span class="text-slate-600">{{ a.summary }}</span>{% endif %}
+      <div class="text-xs text-slate-400">{{ a.created_at }}{% if a.deal_name %} · {{ a.deal_name }}{% endif %}</div>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

@@ -1,0 +1,40 @@
+{# Lender match results for a deal. Score + reasons per lender; AI pros/cons on demand. #}
+{% macro money(v) %}{% if v %}${{ '{:,.0f}'.format(v) }}{% endif %}{% endmacro %}
+<div class="rounded-xl border bg-white shadow-sm">
+  <div class="px-4 py-2 border-b bg-slate-50 text-sm text-slate-500">
+    Lender matches for <b>{{ deal.name }}</b>{% if deal.loan_amount %} · {{ money(deal.loan_amount) }} loan{% endif %}
+  </div>
+  <div class="p-4 space-y-3">
+    {% if not matches %}
+    <p class="text-sm text-slate-400">No lenders fit this deal's box. See excluded below, or broaden your lender book.</p>
+    {% endif %}
+    {% for m in matches %}
+    <div class="rounded-lg border p-3">
+      <div class="flex items-center justify-between">
+        <div class="font-medium">{{ m.name }}
+          <span class="ml-1 text-xs px-2 py-0.5 rounded-full {{ 'bg-emerald-100 text-emerald-800' if m.score >= 70 else 'bg-amber-100 text-amber-800' }}">{{ m.score }}/100</span>
+        </div>
+        <button class="text-xs text-indigo-600 hover:underline"
+                hx-post="/deal/{{ deal.id }}/match/{{ m.id }}/why" hx-target="#why-{{ m.id }}" hx-indicator="#why-spin-{{ m.id }}">AI pros/cons</button>
+      </div>
+      <ul class="mt-1 text-xs text-slate-500 list-disc list-inside">
+        {% for r in m.reasons %}<li>{{ r }}</li>{% endfor %}
+      </ul>
+      {% if m.email %}<div class="mt-1 text-xs text-slate-400">{{ m.contact_name }} · {{ m.email }}</div>{% endif %}
+      <span id="why-spin-{{ m.id }}" class="htmx-indicator text-xs text-slate-400">thinking…</span>
+      <div id="why-{{ m.id }}" class="mt-1"></div>
+    </div>
+    {% endfor %}
+
+    {% if excluded %}
+    <details class="text-sm">
+      <summary class="cursor-pointer text-slate-500">{{ excluded|length }} lender(s) excluded — why</summary>
+      <ul class="mt-2 space-y-1 text-xs text-slate-500">
+        {% for m in excluded %}
+        <li><b>{{ m.name }}</b>: {{ m.reasons|join('; ') }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </div>
+</div>

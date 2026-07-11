@@ -1,0 +1,30 @@
+{# Kanban columns for one pipeline. Re-rendered by /deal/{id}/stage after a move.
+   Stage change = a per-card <select> that HTMX-posts (no drag-drop lib). #}
+{% macro money(v) %}{% if v %}${{ '{:,.0f}'.format(v) }}{% endif %}{% endmacro %}
+<div class="flex gap-4 overflow-x-auto pb-4">
+  {% for col in columns %}
+  <div class="w-64 shrink-0">
+    <div class="flex items-center justify-between mb-2 px-1">
+      <h3 class="text-sm font-semibold text-slate-600">{{ col.stage }}</h3>
+      <span class="text-xs text-slate-400">{{ col.deals|length }}</span>
+    </div>
+    <div class="space-y-2">
+      {% for d in col.deals %}
+      <div class="rounded-lg border bg-white p-3 shadow-sm">
+        <a href="/deal/{{ d.id }}" class="font-medium text-sm hover:underline block">{{ d.name }}</a>
+        <div class="text-xs text-slate-500 mt-0.5">
+          {{ [d.property_type, d.city, d.state]|select|join(' · ') }}
+        </div>
+        {% if d.loan_amount %}<div class="text-xs text-slate-600 mt-1">{{ money(d.loan_amount) }} loan{% if d.ltv %} · {{ d.ltv }}% LTV{% endif %}</div>{% endif %}
+        <select class="mt-2 w-full rounded border text-xs px-1.5 py-1 text-slate-600"
+                hx-post="/deal/{{ d.id }}/stage" hx-target="#board" hx-trigger="change"
+                name="stage" hx-vals='{"pipeline": "{{ pipeline }}"}'>
+          {% for s in PIPELINES[pipeline] %}<option {{ 'selected' if s == d.stage else '' }}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+      {% if not col.deals %}<div class="text-xs text-slate-300 px-1 py-4 text-center border border-dashed rounded-lg">—</div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>

@@ -1,0 +1,30 @@
+{# Extracted deal terms from an uploaded document. #}
+{% set labels = {"property_name":"Property","address":"Address","city":"City","state":"State",
+  "property_type":"Property type","deal_type":"Deal type","purchase_price":"Purchase price",
+  "loan_amount":"Loan amount","ltv":"LTV %","interest_rate":"Rate %","dscr":"DSCR",
+  "cap_rate":"Cap rate %","sponsor":"Sponsor","lender_name":"Lender"} %}
+<div class="rounded-xl border bg-white shadow-sm">
+  <div class="px-4 py-2 border-b bg-slate-50 text-sm text-slate-500">
+    Extracted from <b>{{ filename }}</b>
+    {% if applied %}<span class="ml-2 text-emerald-600">· {{ applied|length }} applied to the deal (reload to see)</span>{% endif %}
+  </div>
+  <div class="p-4">
+    {% if terms.summary %}<p class="text-sm text-slate-600 mb-3">{{ terms.summary }}</p>{% endif %}
+    {% set shown = terms.items()|selectattr('0','ne','summary')|list %}
+    {% if shown %}
+    <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+      {% for k, v in shown %}
+      <div class="flex justify-between border-b border-slate-100 py-1">
+        <dt class="text-slate-500">{{ labels.get(k, k) }}</dt>
+        <dd class="font-medium">{% if k in ('purchase_price','loan_amount') %}${{ '{:,}'.format(v) }}{% else %}{{ v }}{% endif %}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% if not applied %}
+    <p class="mt-3 text-xs text-slate-400">Re-upload with “apply extracted terms” checked to write these onto the deal, or edit the deal fields manually.</p>
+    {% endif %}
+    {% else %}
+    <p class="text-sm text-slate-400">No structured terms found in this document.</p>
+    {% endif %}
+  </div>
+</div>
