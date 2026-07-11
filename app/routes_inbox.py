@@ -31,15 +31,21 @@ def inbox_sync(request: Request, _=Depends(require_auth)):
     deals = db.list_deals()
     logged = 0
     for m in messages:
+        # Was this message already synced? Check BEFORE saving — save_email is idempotent
+        # (returns the existing id on a Message-ID conflict), so a re-sync must skip the
+        # re-log here, not rely on the return value. ponytail: a message with no
+        # Message-ID has no dedup key and will re-log on each sync — rare (real mail sets
+        # one); dedup by content hash only if a provider omits it.
+        mid = m.get("message_id")
+        already = bool(mid) and db.email_exists(mid)
         # match the sender to a deal (its contact, else the deal name in the subject) so
         # the message lands on the right thread (Lev's "Steve from Cain replied" → deal).
         contact = db.contact_by_email(m["from_email"])
         deal_id = inbox.match_email_to_deal(m["from_email"], m["subject"], contact, deals)
-        # store the email (deduped by Message-ID); only log new ones to the feed.
-        new_id = db.save_email("in", m["from_email"], None, m["subject"], m.get("body"),
-                               deal_id=deal_id, message_id=m.get("message_id"))
-        if new_id is None and m.get("message_id"):
-            continue  # already synced on a prior run — don't re-log
+        db.save_email("in", m["from_email"], None, m["subject"], m.get("body"),
+                      deal_id=deal_id, message_id=mid)
+        if already:
+            continue   # stored idempotently already — don't re-log to the feed
         who = (contact["name"] if contact else m["from"]) or m["from_email"]
         db.add_activity("email_in", f"{who} · {m['subject']}", deal_id)
         logged += 1

@@ -547,6 +547,14 @@ def get_email(email_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+def email_exists(message_id: str) -> bool:
+    """Has this inbound message already been synced? Checked before save so a re-sync
+    stores idempotently but doesn't re-log the same email to the feed."""
+    with get_conn() as conn:
+        return conn.execute("SELECT 1 FROM email WHERE message_id = ? LIMIT 1",
+                            (message_id,)).fetchone() is not None
+
+
 # --- market data (base rates, loan comps) ------------------------------------
 
 def upsert_base_rate(name: str, value, delta_1d=None, delta_1m=None) -> None:

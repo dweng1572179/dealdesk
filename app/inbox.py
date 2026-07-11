@@ -9,6 +9,7 @@ if you need sub-minute inbound latency."""
 import email
 import imaplib
 import logging
+import re
 import smtplib
 from email.header import decode_header, make_header
 from email.message import EmailMessage
@@ -71,7 +72,9 @@ def match_email_to_deal(from_email: str, subject: str, contact: dict | None,
     subj = (subject or "").lower()
     for d in sorted(deals, key=lambda x: -len(x.get("name") or "")):
         name = (d.get("name") or "").strip().lower()
-        if len(name) >= 4 and name in subj:
+        # whole-name match at word boundaries — so a deal named "Park" doesn't match
+        # "Sparks fly". Anchored to \b, not a bare substring.
+        if len(name) >= 4 and re.search(r"\b" + re.escape(name) + r"\b", subj):
             return d["id"]
     return None
 
@@ -213,6 +216,9 @@ def demo() -> None:
     assert match_email_to_deal("x@y.com", "re: anything", {"deal_id": 7}, deals) == 7
     assert match_email_to_deal("x@y.com", "Re: Harbor Pointe Apartments term sheet", None, deals) == 1
     assert match_email_to_deal("x@y.com", "unrelated subject", None, deals) is None
+    # word-boundary match: a deal named "Park" must NOT match "Sparks"
+    assert match_email_to_deal("x@y.com", "sparks fly tonight", None, [{"id": 9, "name": "Park"}]) is None
+    assert match_email_to_deal("x@y.com", "the Park deal", None, [{"id": 9, "name": "Park"}]) == 9
     print("inbox.demo OK")
 
 

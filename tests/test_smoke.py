@@ -137,6 +137,7 @@ def run() -> None:
                             "Attached is our indicative term sheet.", deal_id=deal_id, message_id="<m1@x>")
         assert eid and db.save_email("in", "steve@lender.com", None, "dup", "x",
                                      deal_id=deal_id, message_id="<m1@x>") == eid, "message_id must dedup"
+        assert db.email_exists("<m1@x>") and not db.email_exists("<nope@x>"), "email_exists"
         th = c.get(f"/deal/{deal_id}/emails")
         assert th.status_code == 200 and "Term sheet for Test Tower" in th.text
         # reply pre-fills To + a quoted Re: subject

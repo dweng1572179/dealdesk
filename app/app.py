@@ -75,7 +75,10 @@ _LOGIN_WINDOW = 300.0   # ...within this many seconds
 def _login_blocked(ip: str) -> bool:
     now = time.time()
     hits = [t for t in _LOGIN_HITS.get(ip, ()) if now - t < _LOGIN_WINDOW]
-    _LOGIN_HITS[ip] = hits
+    if hits:
+        _LOGIN_HITS[ip] = hits
+    else:
+        _LOGIN_HITS.pop(ip, None)   # drop expired entries so the dict tracks only active IPs
     return len(hits) >= _LOGIN_MAX
 
 
